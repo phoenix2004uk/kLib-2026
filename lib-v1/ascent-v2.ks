@@ -6,15 +6,15 @@ global function logAscentHeaders {
 	if homeConnection:isconnected {
 		deletePath("0:/ascent.csv").
 		log "time,stage,stage_solid_fuel,stage_liquid_fuel,altitude,vertical_speed,ground_speed,air_speed,orbital_velocity,apoapsis,periapsis,apoapsis_eta,q_kpa,mass,max_thrust,available_thrust,max_twr,available_twr,throttle,target_pitch,trajectory_pitch,aoa" to "0:/ascent.csv".
+		set last_ascent_log_time to time:seconds.
 	}
 }
 global last_ascent_log_time is 0.
-global ascent_log_frequency is 0.1.
+global ascent_log_frequency is 0.2.
 global function logAscent {
 	parameter targetPitch is "none".
 	local now is time:seconds.
-	if now < last_ascent_log_time + ascent_log_frequency return.
-	if homeConnection:isconnected {
+	if now > (last_ascent_log_time + ascent_log_frequency) and homeConnection:isconnected {
 		local trajectoryPitch is 90 - vang(UP:vector, srfPrograde:vector).
 		if targetPitch = "none" set targetPitch to trajectoryPitch.
 		local line is list(
