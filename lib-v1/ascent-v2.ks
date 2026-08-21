@@ -141,21 +141,14 @@ global function executeAscentPid {
 	lock steering to srfPrograde.
 	local lock pitchCurrent to 90 - vang(UP:vector, srfPrograde:vector).
 
-	// local lock maxTWR to availableThrust * (body:radius + altitude)^2 / (mass * body:mu).
-	// local pidThrottle is pidLoop(1.05, 10, 0.03, 0, 1, ETA_PID_EPSILON).
 	local pidThrottle is pidLoop(0.05, 0.0005, 0.01, 0.1, 1, ETA_PID_EPSILON).
 	set pidThrottle:setpoint to 75.
-	// local twrFactor is 1.
-	// local lock wantedTWR to max(ASCENT_MIN_TWR, 1 + twrFactor * (maxTWR - 1)).
-	// local lock wantedTWR to twrFactor * maxTWR.
-	// local lock wantedThrottle to choose 1 if availableThrust = 0 else wantedTWR / maxTWR.
 	local wantedThrottle is 1.
 	lock throttle to wantedThrottle.
 
 	when altitude > ASCENT_VECTOR_BORDER then {
 		printLn("Following orbit prograde").
 		lock steering to prograde.
-		// set throttlePid:setpoint to 60.
 	}
 
 	until apoapsis >= apTarget {
@@ -164,10 +157,91 @@ global function executeAscentPid {
 		printLn("    Apoapsis: " + round(apoapsis/1e3,1) + "km / " + round(apTarget/1e3,1) + "km", 2).
 		printLn("Apoapsis ETA: " + round(eta:apoapsis,1) + "s / " + round(pidThrottle:setpoint,1) + "s", 3).
 		printLn("   Periapsis: " + round(periapsis/1e3,1) + "km", 4).
-		// printLn("         TWR: " + round(wantedTWR,2) + " / " + round(maxTWR,2) , 5).
-		printLn("    Throttle: " + round(wantedThrottle*100,2) + "%", 6).
-		printLn("       Pitch: " + round(pitchCurrent,1) + "°", 7).
-		printLn("Throttle PID: P=" + round(pidThrottle:pterm, 3) + " I=" + round(pidThrottle:iterm, 3) + " D=" + round(pidThrottle:dterm, 3) + " O=" + round(pidThrottle:output, 3), 8).
+		printLn("    Throttle: " + round(wantedThrottle*100,2) + "%", 5).
+		printLn("       Pitch: " + round(pitchCurrent,1) + "°", 6).
+		printLn("Throttle PID: P=" + round(pidThrottle:pterm, 3) + " I=" + round(pidThrottle:iterm, 3) + " D=" + round(pidThrottle:dterm, 3) + " O=" + round(pidThrottle:output, 3), 7).
+
+		set wantedThrottle to pidThrottle:update(time:seconds, eta:apoapsis).
+		autostage().
+		wait 0.
+	}
+	
+	printLn("Coasting to space").
+	lock throttle to 0.
+	wait 0.1.
+	wait until altitude > 70e3.
+}
+
+local ASCENT_TWR_MAX is 2.
+local ASCENT_TWR_MIN is 1.4.
+local ASCENT_Q_MAX is 30.
+local ASCENT_Q_MIN is 20.
+global function executeAscentPidV2 {
+	parameter apTarget, incTarget is 0, firstPitch is 80, minVerticalSpeed is 50.
+
+	local launchDirection is 90 - incTarget.
+	local pitchTarget is 90.
+	
+	lock steering to heading(launchDirection, pitchTarget).
+	lock throttle to 1.
+
+	clearScreen.
+	wait 1.
+	logAscentHeaders().
+	stage.
+	printLn("Ignition").
+	wait until stage:ready.
+	printLn("Liftoff!").
+	until velocity:surface:mag >= minVerticalSpeed {
+		logAscent(pitchTarget).
+		wait 0.
+	}
+
+	printLn("Pitching to " + firstPitch + "°").
+	set pitchTarget to firstPitch.
+	awaitSteering().
+
+	printLn("Performing gravity turn").
+	until vang(srfPrograde:vector, facing:vector) < 0.3 {
+		logAscent(pitchTarget).
+		wait 0.
+	}
+
+	printLn("Following surface prograde").
+	lock steering to srfPrograde.
+	local lock pitchCurrent to 90 - vang(UP:vector, srfPrograde:vector).
+
+	local lock twrMax to availableThrust * (body:radius + altitude)^2 / (mass * body:mu).
+	local lock qFraction to 1 - min(1, max(0, ((ship:q * constant:ATMtokPa) - ASCENT_Q_MIN) / (ASCENT_Q_MAX - ASCENT_Q_MIN))).
+	local lock twrLimit to ASCENT_TWR_MIN + (ASCENT_TWR_MAX - ASCENT_TWR_MIN) * qFraction.
+	local lock qThrottle to choose 1 if availableThrust = 0 else min(1, max(0, twrLimit / twrMax)).
+	local pidThrottle is pidLoop(0.05, 0.0005, 0.01, 0.1, 1, ETA_PID_EPSILON).
+	set pidThrottle:setpoint to 75.
+	local wantedThrottle is 1.
+	lock throttle to min(wantedThrottle, qThrottle).
+
+	when altitude > ASCENT_VECTOR_BORDER then {
+		printLn("Following orbit prograde").
+		lock steering to prograde.
+	}
+
+	local maxQ is ship:q * constant:ATMtokPa.
+	until apoapsis >= apTarget {
+		local currQ is ship:q * constant:ATMtokPa.
+		set maxQ to max(maxQ, currQ).
+		logAscent().
+		printLn("    Altitude: " + round(altitude/1e3,1) + "km", 1).
+		printLn("    Apoapsis: " + round(apoapsis/1e3,1) + "km / " + round(apTarget/1e3,1) + "km", 2).
+		printLn("Apoapsis ETA: " + round(eta:apoapsis,1) + "s / " + round(pidThrottle:setpoint,1) + "s", 3).
+		printLn("   Periapsis: " + round(periapsis/1e3,1) + "km", 4).
+		printLn("       Pitch: " + round(pitchCurrent,1) + "°", 5).
+		printLn("           Q: " + round(currQ,2) + "kPA", 6).
+		printLn("      Q{max}: " + round(maxQ,2) + "kPA", 7).
+		printLn("    TWR{max}: " + round(twrMax,2), 8).
+		printLn("    TWR{lim}: " + round(twrLimit,2), 9).
+		printLn("    Throt{q}: " + round(qThrottle*100,2) + "%", 10).
+		printLn("  Throt{pid}: " + round(wantedThrottle*100,2) + "%", 11).
+		printLn("Throttle PID: P=" + round(pidThrottle:pterm, 3) + " I=" + round(pidThrottle:iterm, 3) + " D=" + round(pidThrottle:dterm, 3) + " O=" + round(pidThrottle:output, 3), 12).
 
 		set wantedThrottle to pidThrottle:update(time:seconds, eta:apoapsis).
 		autostage().

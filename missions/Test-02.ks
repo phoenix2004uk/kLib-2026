@@ -28,7 +28,8 @@ set ascentProfile to list(
 
 if status = "PRELAUNCH" {
 	// executeAscent(parkingAltitude, ascentProfile, targetInclination, TWR_MAX, PITCH_DEVIATION_MAX, APOAPSIS_TAPER).
-	executeAscentPid(parkingAltitude, targetInclination).
+	// executeAscentPid(parkingAltitude, targetInclination).
+	executeAscentPidV2(parkingAltitude, targetInclination).
 	panels on.
 	lights on.
 	orbitalInsertion(parkingAltitude).
