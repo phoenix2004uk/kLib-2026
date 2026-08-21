@@ -1,0 +1,7 @@
+# workspace files
+.vscode
+ksconfig.json
+
+# OS/editor noise
+Thumbs.db
+.DS_Store
