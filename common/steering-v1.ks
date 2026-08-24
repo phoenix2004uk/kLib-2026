@@ -1,4 +1,0 @@
-global function awaitSteering {
-	wait 0.
-	wait until vang(ship:facing:vector, steeringManager:target:vector) < 0.25.
-}
