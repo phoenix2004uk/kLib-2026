@@ -1,0 +1,1 @@
+export(lex("printLn",{parameter A,B is 0,C is 0.print A:tostring:padright(terminal:width)AT(C,B).})).

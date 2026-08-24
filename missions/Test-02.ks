@@ -1,41 +1,37 @@
-// #include "../lib-v1/steering-v1.ks"
-// #include "../lib-v1/staging-v1.ks"
-// #include "../lib-v1/ascent-v2.ks"
-// #include "../lib-v1/circularizeAtAp-v1.ks"
+// #include "../lib-v1/kldr-stub.ks"
 
-set TWR_MAX to 1.8.
-set PITCH_DEVIATION_MAX to 10.
-set APOAPSIS_TAPER to 5000.
-set targetInclination to 0.
-set parkingAltitude to 100e3.
-set orbitalStage to 2.
-set ascentProfile to list(
-	2e3, 85,
-	3e3, 80,
-	4e3, 75,
-	5e3, 70,
-	6e3, 65,
-	7e3, 60,
-	8e3, 55,
-	9e3, 50,
-	10e3, 45,
-	20e3, 40,
-	30e3, 30,
-	40e3, 20,
-	50e3, 10,
-	60e3, 0
-).
+local awaitSteering is import("steering-v1"):awaitSteering.
+local stageUntil is import("staging-v1"):stageUntil.
+local printLn is import("printLn-v1"):printLn.
+local ascent is import("ascent-v2").
+local circularizeAtAp is import("mnv/circularizeAtAp-v1").
+local matchInclination is import("mnv/matchInclination-v1").
+local execute is import("mnv/executeNode-v1").
+clearScreen.
+
+local parkingAltitude is 100e3.
+local targetInclination is 0.
+local orbitalStage is 2.
 
 if status = "PRELAUNCH" {
-	// executeAscent(parkingAltitude, ascentProfile, targetInclination, TWR_MAX, PITCH_DEVIATION_MAX, APOAPSIS_TAPER).
-	// executeAscentPid(parkingAltitude, targetInclination).
-	executeAscentPidV2(parkingAltitude, targetInclination).
+	ascent:executeAscent(parkingAltitude, targetInclination).
 	panels on.
 	lights on.
-	orbitalInsertion(parkingAltitude).
+	ascent:orbitalInsertion(parkingAltitude).
+	printLn("Dropping Ascent Stage").
 	stageUntil(orbitalStage).
+	printLn("Circularizing at Apoapsis").
 	circularizeAtAp().
+	execute:warpToNode(10).
+	execute:executeNode(10).
+	printLn("Orbit achieved").
 }
+
+wait until hasTarget.
+printLn("Matching planes").
+matchInclination().
+// execute:warpToNode(10).
+// execute:executeNode(10).
 
 on abort {
 	lock steering to retrograde.
@@ -44,6 +40,7 @@ on abort {
 	wait until periapsis < 35e3.
 	lock throttle to 0.
 	lock steering to srfRetrograde.
+	wait 1.
 	stageUntil(0).
 	wait until status = "LANDED" or status = "SPLASHED".
 	unlock steering.

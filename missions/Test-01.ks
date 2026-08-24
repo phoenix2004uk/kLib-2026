@@ -1,5 +1,7 @@
-// #include "../lib-v1/orbitalParameters-v1.ks"
-// #include "../lib-v1/orbitalMechanics-v1.ks"
+// #include "../lib-v1/kldr-stub.ks"
+local OrbitalParameters is import("OrbitalParameters-v1").
+local orbitalMechanics is import("orbitalMechanics-v1").
+clearScreen.
 
 // ------------------------------------------------------------
 // Orbital Mechanics Test Suite
