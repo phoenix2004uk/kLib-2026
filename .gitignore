@@ -5,3 +5,5 @@ ksconfig.json
 # OS/editor noise
 Thumbs.db
 .DS_Store
+
+far_test.ks
