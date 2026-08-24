@@ -6,4 +6,8 @@ ksconfig.json
 Thumbs.db
 .DS_Store
 
+# kos-Ferram test script
 far_test.ks
+
+# old function library
+common
