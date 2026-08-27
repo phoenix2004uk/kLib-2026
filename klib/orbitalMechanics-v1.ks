@@ -27,7 +27,10 @@
 
 	// returns the eta until the V1 trueanomaly
 	function TrueAnomalyEta {
-		parameter V1, P is orbit:period, V0 is orbit:trueanomaly, e is orbit:eccentricity.
+		parameter V1,
+			P is orbit:period,
+			V0 is orbit:trueanomaly,
+			e is orbit:eccentricity.
 
 		if e >= 1 {
 			print "Error: TrueAnomalyEta is only valid for elliptical orbits".
@@ -50,7 +53,10 @@
 
 	// returns the time to travel Vdelta degrees from V0 trueanomly
 	function TrueAnomalyArcTime {
-		parameter Vdelta, P is orbit:period, V0 is orbit:trueanomaly, e is orbit:eccentricity.
+		parameter Vdelta,
+			P is orbit:period,
+			V0 is orbit:trueanomaly,
+			e is orbit:eccentricity.
 
 		if e >= 1 {
 			print "Error: TrueAnomalyArcTime is only valid for elliptical orbits".
@@ -105,6 +111,7 @@
 
 		if e <= 1 {
 			print "Error: TrueAnomalyEtaHyperbolic is only valid for hyperbolic orbits.".
+			return false.
 		}
 
 		local F0 is OrbitalParameters:F(V0, e).
@@ -113,10 +120,14 @@
 		local F1 is OrbitalParameters:F(V1, e).
 		local M1 is OrbitalParameters:Mh(F1, e).
 
+		local dM is M1 - M0.
+		// Eliminate floating-point noise around zero.
+		if abs(dM) < ANOMALY_TOLERANCE set dM to 0.
+
 		// Hyperbolic mean motion, converted from rad/s to deg/s.
 		local n is sqrt(b:mu / (-a)^3) * constant:radToDeg.
 
-		return (M1 - M0) / n.
+		return dM / n.
 	}
 
 	function TrueAnomalyEtaHyperbolicAN {
