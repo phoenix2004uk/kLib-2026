@@ -50,8 +50,10 @@
 
 		if e >= 1 { print "Error: EccentricAnomaly is only valid for elliptical orbits". }
 
-		local eccentricAnomalyDegrees is arccos( (e + cos(V0)) / (1 + e * cos(V0))).
-		if (V0 > 180) {
+		local VN is mod(V0 + 360, 360).
+
+		local eccentricAnomalyDegrees is arccos( (e + cos(VN)) / (1 + e * cos(VN))).
+		if (VN > 180) {
 			set eccentricAnomalyDegrees to 360 - eccentricAnomalyDegrees.
 		}
 		return eccentricAnomalyDegrees.
