@@ -1,51 +1,63 @@
-// #include "../lib-v1/kldr-stub.ks"
-
-local awaitSteering is import("steering-v1"):awaitSteering.
-local stageUntil is import("staging-v1"):stageUntil.
-local printLn is import("printLn-v1"):printLn.
-local ascent is import("ascent-v2").
-local circularizeAtAp is import("mnv/circularizeAtAp-v1").
-local matchInclination is import("mnv/matchInclination-v1").
+// local matchInclination is import("mnv/matchInclination-v1").
+local rendezvous is import("mnv/rendezvous-v1").
 local execute is import("mnv/executeNode-v1").
 clearScreen.
 
-local parkingAltitude is 100e3.
-local targetInclination is 0.
-local orbitalStage is 2.
-
-if status = "PRELAUNCH" {
-	ascent:executeAscent(parkingAltitude, targetInclination).
-	panels on.
-	lights on.
-	ascent:orbitalInsertion(parkingAltitude).
-	printLn("Dropping Ascent Stage").
-	stageUntil(orbitalStage).
-	printLn("Circularizing at Apoapsis").
-	circularizeAtAp().
-	execute:warpToNode(10).
-	execute:executeNode(10).
-	printLn("Orbit achieved").
-}
-
+unset target.
+wait 1.
 wait until hasTarget.
-printLn("Matching planes").
-matchInclination().
-// execute:warpToNode(10).
-// execute:executeNode(10).
+{
+	until not hasNode {
+		remove nextNode.
+		wait 1.
+	}
 
-on abort {
-	lock steering to retrograde.
-	awaitSteering().
-	lock throttle to 1.
-	wait until periapsis < 35e3.
-	lock throttle to 0.
-	lock steering to srfRetrograde.
-	wait 1.
-	stageUntil(0).
-	wait until status = "LANDED" or status = "SPLASHED".
-	unlock steering.
-	wait 5.
-	sas on.
+	local result is rendezvous(target, 0).
+
+	if (result:ok) {
+		local mnvDeparture is result:val:departure.
+		local mnvArrival is result:val:arrival.
+		local trn is result:val:trn.
+
+		add mnvDeparture.
+		wait 0.
+		{
+			// DEBUG
+			local shipPosition is positionAt(ship, trn:arrivalUT).
+			local targetPosition is positionAt(target, trn:arrivalUT).
+			local vecSeparation is targetPosition - shipPosition.
+			local distance is vecSeparation:mag.
+
+			local vecShipRadius is shipPosition - body:position.
+			local vecTargetRadius is targetPosition - body:position.
+
+			clearVecDraws().
+			vecDraw(V(0,0,0), shipPosition, RED, "ship future", 1, true, 0.1).
+			vecDraw(V(0,0,0), targetPosition, GREEN, "target future", 1, true, 0.1).
+			vecDraw(shipPosition, vecSeparation, CYAN, "distance", 1, true, 0.1).
+			vecDraw(body:position, vecShipRadius, YELLOW, "ship radius", 1, true, 0.1).
+			vecDraw(body:position, vecTargetRadius, MAGENTA, "target radius", 1, true, 0.1).
+
+			local targetVelocity is velocityAt(target, trn:arrivalUT):orbit.
+			local vecTargetRadiusHat is vecTargetRadius:normalized.
+
+			// Remove the radial component, leaving pure prograde tangent
+			local vecTargetTangent is targetVelocity - vecTargetRadiusHat * vdot(targetVelocity, vecTargetRadiusHat).
+			local vecTargetTangentHat is vecTargetTangent:normalized.
+			local phase is arctan2(
+				vdot(vecShipRadius, vecTargetTangentHat),
+				vdot(vecShipRadius, vecTargetRadiusHat)
+			).
+			print("  target distance at intercept = " + distance).
+			print("  target phase at intercept = " + phase).
+		}
+
+		add mnvArrival.
+		wait 30.
+		clearVecDraws().
+
+		// execute:executeNode(60).
+		// execute:executeNode(60).
+	}
+	else print result:msg.
 }
-
-wait until 0.

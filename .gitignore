@@ -11,3 +11,13 @@ far_test.ks
 
 # old function library
 common
+
+# debug files
+debug.txt
+
+# porkchop files
+porkchop*.txt
+porkchop*.html
+porkchop*.png
+porkchop*.svg
+plot_porkchop.py
