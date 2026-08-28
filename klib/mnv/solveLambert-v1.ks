@@ -1,0 +1,342 @@
+{
+	local math is import("math-v1").
+
+	// Izzo Lambert solver, adapted from ESA kep3/pykep lambert_problem.cpp (MPL-2.0):
+	// https://github.com/esa/pykep/blob/master/src/lambert_problem.cpp
+	local MAXIMUM_LAMBERT_HOUSEHOLDER_ITERATIONS is 15.
+	local MAXIMUM_LAMBERT_HALLEY_ITERATIONS is 13.
+	local MAXIMUM_LAMBERT_HYPERGEOMETRIC_ITERATIONS is 1000.
+	local LAMBERT_ZERO_REV_X_TOLERANCE is 1e-5.
+	local LAMBERT_MULTI_REV_X_TOLERANCE is 1e-8.
+	local LAMBERT_HALLEY_X_TOLERANCE is 1e-13.
+	local LAMBERT_HYPERGEOMETRIC_TOLERANCE is 1e-11.
+	local LAMBERT_GEOMETRY_TOLERANCE is 1e-10.
+	local LAMBERT_DENOMINATOR_TOLERANCE is 1e-15.
+	local LAMBERT_ENDPOINT_TOLERANCE is 1e-9.
+	local BATTIN_LIMIT is 0.01.
+	local LAGRANGE_LIMIT is 0.2.
+
+	local function LambertFail {
+		parameter reason.
+		return lex("valid", false, "reason", reason).
+	}
+
+	// Gaussian hypergeometric series used by Izzo's Battin TOF expression.
+	local function LambertHypergeometricF {
+		parameter z.
+
+		local Sj is 1.
+		local Cj is 1.
+		local error is 1.
+
+		from { local j is 0. }
+		until error <= LAMBERT_HYPERGEOMETRIC_TOLERANCE
+			or j >= MAXIMUM_LAMBERT_HYPERGEOMETRIC_ITERATIONS
+		step { set j to j + 1. }
+		do {
+			local Cj1 is Cj * (3 + j) * (1 + j) / (2.5 + j) * z / (j + 1).
+			set Sj to Sj + Cj1.
+			set error to abs(Cj1).
+			set Cj to Cj1.
+		}
+
+		return Sj.
+	}
+
+	// Izzo nondimensional time-of-flight function T(x).
+	local function LambertXToTOF {
+		parameter x, lambda, revolutions.
+
+		local distanceFromOne is abs(x - 1).
+
+		// Lagrange expression near x = 1.
+		if distanceFromOne < LAGRANGE_LIMIT and distanceFromOne > BATTIN_LIMIT {
+			local a is 1 / (1 - x^2).
+
+			if a > 0 {
+				// Elliptical branch.
+				// kOS inverse trig is degrees; Izzo requires radians here.
+				local alpha is 2 * arccos(max(-1, min(1, x))) * constant:DegToRad.
+				local beta is 2 * arcsin(sqrt(max(0, min(1, lambda^2 / a)))) * constant:DegToRad.
+				if lambda < 0 set beta to -beta.
+
+				return a * sqrt(a) * (
+					(alpha - sin(alpha * constant:RadToDeg))
+					- (beta - sin(beta * constant:RadToDeg))
+					+ 2 * constant:PI * revolutions
+				) / 2.
+			}
+
+			// Hyperbolic branch.
+			local alpha is 2 * math:acosh(x).
+			local beta is 2 * math:asinh(sqrt(-lambda^2 / a)).
+			if lambda < 0 set beta to -beta.
+
+			return -a * sqrt(-a) * (
+				(beta - math:sinh(beta)) - (alpha - math:sinh(alpha))
+			) / 2.
+		}
+
+		local lambda2 is lambda^2.
+		local E is x^2 - 1.
+		local rho is abs(E).
+		local z is sqrt(max(0, 1 + lambda2 * E)).
+
+		// Battin series.
+		if distanceFromOne < BATTIN_LIMIT {
+			local dt is z - lambda * x.
+			local S1 is 0.5 * (1 - lambda - x * dt).
+			local Qh is 4 / 3 * LambertHypergeometricF(S1).
+
+			return (dt^3 * Qh + 4 * lambda * dt) / 2
+				+ revolutions * constant:PI / rho^1.5.
+		}
+
+		// Lancaster expression.
+		local y is sqrt(rho).
+		local g is x * z - lambda * E.
+		local d is 0.
+
+		if E < 0 {
+			set d to revolutions * constant:PI
+				+ arccos(max(-1, min(1, g))) * constant:DegToRad.
+		}
+		else {
+			local f is y * (z - lambda * x).
+			set d to ln(f + g).
+		}
+
+		return (x - lambda * z - d / y) / E.
+	}
+
+	// First three derivatives dT/dx, d2T/dx2, d3T/dx3, packed into a Vector.
+	local function LambertTOFDerivatives {
+		parameter x, T, lambda.
+
+		local lambda2 is lambda^2.
+		local lambda3 is lambda2 * lambda.
+		local oneMinusX2 is 1 - x^2.
+		local y is sqrt(1 - lambda2 * oneMinusX2).
+		local y2 is y^2.
+		local y3 is y^3.
+		local DT is (3 * T * x - 2 + 2 * lambda3 * x / y) / oneMinusX2.
+		local DDT is (3 * T + 5 * x * DT + 2 * (1 - lambda2) * lambda3 / y3) / oneMinusX2.
+		local DDDT is (
+			7 * x * DDT + 8 * DT
+			- 6 * (1 - lambda2) * lambda2 * lambda3 * x / y3 / y2
+		) / oneMinusX2.
+
+		return V(DT, DDT, DDDT).
+	}
+
+	// Householder iteration for T(x) = targetT.
+	local function LambertHouseholder {
+		parameter targetT, x0, lambda, revolutions, tolerance.
+
+		local x is x0.
+
+		from { local iteration is 0. }
+		until iteration >= MAXIMUM_LAMBERT_HOUSEHOLDER_ITERATIONS
+		step { set iteration to iteration + 1. }
+		do {
+			local actualT is LambertXToTOF(x, lambda, revolutions).
+			local derivatives is LambertTOFDerivatives(x, actualT, lambda).
+			local delta is actualT - targetT.
+			local DT is derivatives:x.
+			local DDT is derivatives:y.
+			local DDDT is derivatives:z.
+			local DT2 is DT^2.
+			local denominator is DT * (DT2 - delta * DDT) + DDDT * delta^2 / 6.
+
+			if abs(denominator) < LAMBERT_DENOMINATOR_TOLERANCE {
+				return LambertFail("Lambert Householder denominator is singular").
+			}
+
+			local xNew is x - delta * (DT2 - delta * DDT / 2) / denominator.
+			if abs(x - xNew) < tolerance {
+				return lex("valid", true, "x", xNew, "iterations", iteration + 1).
+			}
+			set x to xNew.
+		}
+
+		return LambertFail("Lambert Householder iteration did not converge").
+	}
+
+	// Determine whether a requested multi-revolution solution exists.
+	local function LambertRevolutionExists {
+		parameter targetT, lambda, revolutions, T00.
+
+		if revolutions <= 0 return true.
+		if revolutions > floor(targetT / constant:PI) return false.
+
+		local TMin is T00 + revolutions * constant:PI.
+		if targetT >= TMin return true.
+
+		local x is 0.
+		from { local iteration is 0. }
+		until iteration >= MAXIMUM_LAMBERT_HALLEY_ITERATIONS
+		step { set iteration to iteration + 1. }
+		do {
+			local derivatives is LambertTOFDerivatives(x, TMin, lambda).
+			local DT is derivatives:x.
+			local DDT is derivatives:y.
+			local DDDT is derivatives:z.
+			local denominator is DDT^2 - DT * DDDT / 2.
+			if abs(denominator) < LAMBERT_DENOMINATOR_TOLERANCE break.
+
+			local xNew is x - DT * DDT / denominator.
+			if abs(x - xNew) < LAMBERT_HALLEY_X_TOLERANCE {
+				set x to xNew.
+				break.
+			}
+
+			set x to xNew.
+			set TMin to LambertXToTOF(x, lambda, revolutions).
+		}
+
+		return targetT >= TMin.
+	}
+
+	// Find Izzo's x for one requested Lambert solution.
+	local function LambertSolveX {
+		parameter T, lambda, revolutions, branch is "left".
+
+		local lambda2 is lambda^2.
+		local lambda3 is lambda2 * lambda.
+		local T00 is arccos(max(-1, min(1, lambda))) * constant:DegToRad
+			+ lambda * sqrt(max(0, 1 - lambda2)).
+
+		if not LambertRevolutionExists(T, lambda, revolutions, T00) {
+			return LambertFail("Requested Lambert revolution count has no solution").
+		}
+
+		if revolutions = 0 {
+			local T1 is 2 / 3 * (1 - lambda3).
+			local x0 is 0.
+
+			if T >= T00 {
+				set x0 to -(T - T00) / (T - T00 + 4).
+			}
+			else if T <= T1 {
+				set x0 to T1 * (T1 - T)
+					/ ((2 / 5) * (1 - lambda2 * lambda3) * T) + 1.
+			}
+			else {
+				set x0 to (T / T00)^(ln(2) / ln(T1 / T00)) - 1.
+			}
+
+			return LambertHouseholder(
+				T, x0, lambda, 0, LAMBERT_ZERO_REV_X_TOLERANCE
+			).
+		}
+
+		if branch <> "left" and branch <> "right" {
+			return LambertFail("Lambert multi-revolution branch must be left or right").
+		}
+
+		local tmp is 0.
+		if branch = "left" {
+			set tmp to ((revolutions * constant:PI + constant:PI) / (8 * T))^(2 / 3).
+		}
+		else {
+			set tmp to (8 * T / (revolutions * constant:PI))^(2 / 3).
+		}
+		local x0 is (tmp - 1) / (tmp + 1).
+
+		return LambertHouseholder(
+			T, x0, lambda, revolutions, LAMBERT_MULTI_REV_X_TOLERANCE
+		).
+	}
+
+	// Izzo Lambert solver. planeNormal is conventional right-handed angular momentum;
+	// construct it as -vcrs(r, velocity) because KSP/kOS VCRS is left-handed.
+	function solveLambert {
+		parameter r1, r2, tof, mu,
+			direction is "short", revolutions is 0, branch is "left", planeNormal is false.
+
+		if tof <= 0 return LambertFail("Lambert time of flight must be positive").
+		if mu <= 0 return LambertFail("Lambert gravitational parameter must be positive").
+		if direction <> "short" and direction <> "long" {
+			return LambertFail("Lambert direction must be short or long").
+		}
+		if revolutions < 0 return LambertFail("Lambert revolution count cannot be negative").
+
+		local r1mag is r1:mag.
+		local r2mag is r2:mag.
+		if r1mag <= 0 or r2mag <= 0 {
+			return LambertFail("Lambert position vectors must be non-zero").
+		}
+
+		local chord is (r2 - r1):mag.
+		if chord <= LAMBERT_ENDPOINT_TOLERANCE {
+			return LambertFail("Coincident Lambert endpoints are not supported").
+		}
+
+		local semiperimeter is (chord + r1mag + r2mag) / 2.
+		local ir1 is r1 / r1mag.
+		local ir2 is r2 / r2mag.
+		local lambda2 is max(0, min(1, 1 - chord / semiperimeter)).
+		local lambda is sqrt(lambda2).
+
+		// Negate VCRS so the remaining vector algebra follows Izzo's right-handed formulation.
+		local endpointCross is -vcrs(ir1, ir2).
+		local ih is false.
+
+		if endpointCross:mag > LAMBERT_GEOMETRY_TOLERANCE {
+			set ih to endpointCross:normalized.
+		}
+		else {
+			if not planeNormal:istype("Vector") {
+				return LambertFail("Lambert transfer plane is undefined; provide planeNormal").
+			}
+			if planeNormal:mag <= LAMBERT_GEOMETRY_TOLERANCE {
+				return LambertFail("Lambert planeNormal must be non-zero").
+			}
+			set ih to planeNormal:normalized.
+		}
+
+		local it1 is (-vcrs(ih, ir1)):normalized.
+		local it2 is (-vcrs(ih, ir2)):normalized.
+
+		if direction = "long" {
+			set lambda to -lambda.
+			set it1 to -it1.
+			set it2 to -it2.
+		}
+
+		local T is sqrt(2 * mu / semiperimeter^3) * tof.
+		local xResult is LambertSolveX(T, lambda, revolutions, branch).
+		if not xResult:valid return xResult.
+
+		local x is xResult:x.
+		local y is sqrt(max(0, 1 - lambda2 + lambda2 * x^2)).
+		local gamma is sqrt(mu * semiperimeter / 2).
+		local rho is (r1mag - r2mag) / chord.
+		local sigma is sqrt(max(0, 1 - rho^2)).
+		local lambdaYMinusX is lambda * y - x.
+		local lambdaYPlusX is lambda * y + x.
+		local radial1 is gamma * (lambdaYMinusX - rho * lambdaYPlusX) / r1mag.
+		local radial2 is -gamma * (lambdaYMinusX + rho * lambdaYPlusX) / r2mag.
+		local tangential is gamma * sigma * (y + lambda * x).
+		local departureVelocity is radial1 * ir1 + tangential / r1mag * it1.
+		local arrivalVelocity is radial2 * ir2 + tangential / r2mag * it2.
+
+		return lex(
+			"valid", true,
+			"departureVelocity", departureVelocity,
+			"arrivalVelocity", arrivalVelocity,
+			"direction", direction,
+			"revolutions", revolutions,
+			"branch", branch,
+			"x", x,
+			"y", y,
+			"lambda", lambda,
+			"T", T,
+			"chord", chord,
+			"semiperimeter", semiperimeter,
+			"iterations", xResult:iterations
+		).
+	}
+
+	export(solveLambert@).
+}

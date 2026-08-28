@@ -1,0 +1,1 @@
+{export({parameter Z,Y is lex().if not Z:istype("Lexicon")return ApiFail("Configuration defaults must be a Lexicon").if not Y:istype("Lexicon")return ApiFail("Configuration options must be a Lexicon").local X is lex().for T in Z:keys X:add(T,Z[T]).for T in Y:keys{if not X:haskey(T)return ApiFail("Unknown configuration option: "+T).set X[T]to Y[T].}return ApiOK(X).}).}

@@ -1,7 +1,7 @@
-// #include "../kldr-stub.ks"
 {
 	local OrbitalMechanics is import("OrbitalMechanics-v1").
 	local OrbitalParameters is import("OrbitalParameters-v1").
+	local velocityChangeToNode is import("mnv/velocityChangeToNode-v1").
 
 	function getRelativeInclination {
 		parameter targetOrbitable is target, atTime is time:seconds.
@@ -127,39 +127,19 @@
 		local timeNextNode is time:seconds + etaNextNode.
 		if selectedNode = "DN" set theta to -theta.
 
-		// 1. Fetch exact raw future positions/velocities at the same moment in time
 		local futureShipRaw is positionAt(ship, timeNextNode).
 		local shipVelocityAtNode is velocityAt(ship, timeNextNode):orbit.
 
-		// 2. Build the correct future-relative coordinate system
-		local vecPrograde is shipVelocityAtNode:normalized.
 		local vecRadial is (futureShipRaw - body:position):normalized. // true body-radial direction
-		local vecNormal is -vcrs(vecRadial, vecPrograde):normalized.
-		local vecTransverse is vcrs(vecNormal, vecPrograde):normalized. // node radial-out
-
-		// 3. Perform the rotation on the future velocity
 		local rotatedVelocityVector is angleAxis(theta, vecRadial) * shipVelocityAtNode.
 
-		// vecDraw debugging
-		// {
-		// 	clearVecDraws().
-		// 	vecDraw(V(0,0,0), {return futureShipRaw.}, BLUE, "ship future", 1, true, 0.1).
-		// 	vecDraw(V(0,0,0), {return body:position.}, BLUE, "body now", 1, true, 0.1).
-		// 	vecDraw(V(0,0,0), {return futureShipRaw - body:position.}, BLUE, "body future", 1, true, 0.1).
-		// 	vecDraw({return futureShipRaw.}, {return vecPrograde * shipVelocityAtNode:mag.}, YELLOW, "prograde", 100, true, 0.0005).
-		// 	vecDraw({return futureShipRaw.}, {return vecNormal * shipVelocityAtNode:mag.}, MAGENTA, "normal", 100, true, 0.0005).
-		// 	vecDraw({return futureShipRaw.}, {return vecRadialOut * shipVelocityAtNode:mag.}, CYAN, "radial", 100, true, 0.0005).
-		// 	vecDraw({return futureShipRaw.}, {return vecTransverse * shipVelocityAtNode:mag.}, BLUE, "transverse", 100, true, 0.0005).
-		// 	vecDraw({return futureShipRaw.}, {return rotatedVelocityVector.}, GREEN, "theta", 100, true, 0.0005).
-		// }
-
-		// 4. Project the deltaV vector onto each of the maneuver node's radial/normal/prograde vectors
-		local deltaV is rotatedVelocityVector - shipVelocityAtNode.
-		local dvRadial is vdot(deltaV, vecTransverse).
-		local dvNormal is vdot(deltaV, vecNormal).
-		local dvPrograde is vdot(deltaV, vecPrograde).
-
-		local mnv is node(timeNextNode, dvRadial, dvNormal, dvPrograde).
+		local mnv is velocityChangeToNode(
+			timeNextNode,
+			futureShipRaw - body:position,
+			shipVelocityAtNode,
+			rotatedVelocityVector
+		).
+		// local mnv is node(timeNextNode, dvRadial, dvNormal, dvPrograde).
 		return ApiOK(mnv, "Maneuver planned").
 	}
 	export(matchInclination@).
