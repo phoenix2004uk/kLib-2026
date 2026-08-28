@@ -1,4 +1,3 @@
-// #include "kldr-stub.ks"
 {
 	function cosh {
 		parameter x.
@@ -18,9 +17,16 @@
 		return (constant:e^x - constant:e^(-x)) / 2.
 	}
 
+	function asinh {
+		parameter x.
+
+		return ln(x + sqrt(x^2 + 1)).
+	}
+
 	export(lex(
 		"cosh", cosh@,
 		"acosh", acosh@,
-		"sinh", sinh@
+		"sinh", sinh@,
+		"asinh", asinh@
 	)).
 }

@@ -2,6 +2,7 @@ wait until ship:unpacked.
 core:part:getmodule("kOSProcessor"):doevent("Open Terminal").
 set ship:control:pilotmainthrottle to 0.
 sas off.
+set config:ipu to 200.
 clearScreen.
 {
 	function copyBest {
@@ -33,6 +34,23 @@ clearScreen.
 	global export is {
 		parameter object.
 		importStack:push(object).
+	}.
+
+	local ApiResult is {
+		parameter success, value is success, message is "".
+		return lex(
+			"ok", success,
+			"val", value,
+			"msg", message
+		).
+	}.
+	global ApiOK is {
+		parameter value, message is "".
+		return ApiResult(true, value, message).
+	}.
+	global ApiFail is {
+		parameter message, value is false.
+		return ApiResult(false, value, message).
 	}.
 
 	local missionFilepath is "/missions/" + (choose ship:name if not core:tag else core:tag).

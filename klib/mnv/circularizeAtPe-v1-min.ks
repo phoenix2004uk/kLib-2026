@@ -1,1 +1,0 @@
-{local A is import("OrbitalMechanics-v1"):v. local B is import("OrbitalParameters-v1"):a. export({local Z is periapsis. local Y is node(time:seconds+eta:periapsis,0,0,A(Z,B(Z,Z))-A(Z)).add Y.}).}

@@ -1,4 +1,3 @@
-// #include "../kldr-stub.ks"
 {
 	local OrbitalMechanics is import("OrbitalMechanics-v1").
 	local OrbitalParameters is import("OrbitalParameters-v1").
@@ -8,7 +7,7 @@
 		local v1 is OrbitalMechanics:v(periapsis, OrbitalParameters:a(periapsis, periapsis)).
 		local dV is v1 - v0.
 		local mnv is node(burnTime, 0, 0, dV).
-		add mnv.
+		return ApiOK(mnv).
 	}
 	export(circularizeAtPe@).
 }
