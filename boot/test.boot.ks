@@ -38,7 +38,7 @@ clearScreen.
 		return ApiResult(false, value, message).
 	}.
 
-	local missionFilepath is "/missions/" + (choose ship:name if not core:tag else core:tag).
+	local missionFilepath is "/missions/" + ship:name.
 	if status = "PRELAUNCH" {
 		if not homeConnection:isconnected {
 			print "Error! No KSC Connection".

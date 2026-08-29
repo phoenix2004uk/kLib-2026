@@ -1,38 +1,38 @@
 {
-	// TODO: Once calculation is implemented, we will actually store this in a flattened file to be read, instead of hard-coded lex loaded at runtime
+	// Max altitude data collected by sweeping each planet surface with a grid resolution of 0.25°, with a local refinement around the maxima of 0.025°
 	local MAX_TERRAIN_HEIGHTS is lex(
-		"Sun", 0,
-		"Kerbin", 0,
-		"Mun", 7500,
-		"Minmus", 6e3,
-		"Moho", 7e3,
-		"Eve", 0,
-		"Duna", 0,
-		"Ike", 13e3,
-		"Jool", 0,
-		"Laythe", 0,
-		"Vall", 8500,
-		"Bop", 22e3,
-		"Tylo", 12e3,
-		"Gilly", 7e3,
-		"Pol", 6e3,
-		"Dres", 0,
-		"Eeloo", 0,
+		"Sun",    0,
+		"Kerbin", 6760,
+		"Mun",    7057,
+		"Minmus", 5725,
+		"Moho",   6816,
+		"Eve",    7537,
+		"Duna",   8264,
+		"Ike",    12734,
+		"Jool",   0,
+		"Laythe", 6060,
+		"Vall",   7975,
+		"Bop",    21755,
+		"Tylo",   12894,
+		"Gilly",  6401,
+		"Pol",    4889,
+		"Dres",   5670,
+		"Eeloo",  3795,
 		"Sarnus", 0,
-		"Hale", 0,
-		"Ovok", 0,
-		"Slate", 0,
-		"Tekto", 0,
-		"Urlum", 0,
-		"Polta", 0,
-		"Priax", 0,
-		"Wal", 0,
-		"Tal", 0,
+		"Hale",   5918,
+		"Ovok",   14000,
+		"Slate",  16398,
+		"Tekto",  5873,
+		"Urlum",  0,
+		"Polta",  8649,
+		"Priax",  30483,
+		"Wal",    20773,
+		"Tal",    11777,
 		"Neidon", 0,
-		"Thatmo", 0,
-		"Nissee", 0,
-		"Plock", 0,
-		"Karen", 0
+		"Thatmo", 4825,
+		"Nissee", 8936,
+		"Plock",  3330,
+		"Karen",  4604
 	).
 
 	// given either a Body object or a string, will attempt to return the Body object if it exists
@@ -47,29 +47,6 @@
 		}
 		// we use targetBodyQuery:tostring, so that if the caller uses the global `Mun` then we print Body("Mun"), if the caller uses the string "Mun" then we print "Mun"
 		else return ApiFail(targetBodyQuery:tostring + " is not a valid Body").
-	}
-
-	function populateDatabase {
-		local allBodies is list().
-		list bodies in allBodies.
-		for b in allBodies calculateMaxTerrainHeight(b).
-	}
-
-	// This function will calculate the max terrain height of the specified body, and store it in `MAX_TERRAIN_HEIGHTS`
-	function calculateMaxTerrainHeight {
-		parameter targetBodyQuery.
-
-		local selectBodyResult is selectBody(targetBodyQuery).
-		if not selectBodyResult:ok return selectBodyResult.
-
-		local targetBody is selectBodyResult:val.
-		if not targetBody:hasSolidSurface {
-			set MAX_TERRAIN_HEIGHTS[targetBody:name] to 0.
-			return ApiOK(true).
-		}
-
-		// TODO: iterate the surface to find the max altitude, for now just return with true
-		return ApiOK(true).
 	}
 
 	function getSafeAltitude {
@@ -105,8 +82,6 @@
 
 	export(lex(
 		"altitude", getSafeAltitude@,
-		"radius", getSafeRadius@,
-		"calculate", calculateMaxTerrainHeight@,
-		"calculateAll", populateDatabase@
+		"radius", getSafeRadius@
 	)).
 }
