@@ -1250,7 +1250,7 @@
 
 		dPrint("--------------------------------").
 		dPrint("GRID LEVEL " + level).
-		dPrint("evaluated = " + evaluation:nextCellId).
+		dPrint("evaluated = " + evaluation:evaluated).
 		dPrint("valid = " + evaluation:valid).
 		dPrint("invalid = " + evaluation:invalid).
 
