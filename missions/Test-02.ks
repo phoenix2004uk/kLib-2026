@@ -9,7 +9,11 @@ until not hasNode {
 	wait 1.
 }
 
+local startUT is time:seconds.
 local result is rendezvous(target, 0).
+local endUT is time:seconds.
+print("  started at = " + startUT).
+print("  ended at = " + endUT).
 // local result is rendezvous(target:orbit, 0).
 // local result is rendezvous(createOrbit(
 // 	target:orbit:inclination,
