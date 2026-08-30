@@ -16,13 +16,13 @@
 	local BATTIN_LIMIT is 0.01.
 	local LAGRANGE_LIMIT is 0.2.
 
-	local function LambertFail {
+	function LambertFail {
 		parameter reason.
 		return lex("valid", false, "reason", reason).
 	}
 
 	// Gaussian hypergeometric series used by Izzo's Battin TOF expression.
-	local function LambertHypergeometricF {
+	function LambertHypergeometricF {
 		parameter z.
 
 		local Sj is 1.
@@ -44,7 +44,7 @@
 	}
 
 	// Izzo nondimensional time-of-flight function T(x).
-	local function LambertXToTOF {
+	function LambertXToTOF {
 		parameter x, lambda, revolutions.
 
 		local distanceFromOne is abs(x - 1).
@@ -110,7 +110,7 @@
 	}
 
 	// First three derivatives dT/dx, d2T/dx2, d3T/dx3, packed into a Vector.
-	local function LambertTOFDerivatives {
+	function LambertTOFDerivatives {
 		parameter x, T, lambda.
 
 		local lambda2 is lambda^2.
@@ -130,7 +130,7 @@
 	}
 
 	// Householder iteration for T(x) = targetT.
-	local function LambertHouseholder {
+	function LambertHouseholder {
 		parameter targetT, x0, lambda, revolutions, tolerance.
 
 		local x is x0.
@@ -163,7 +163,7 @@
 	}
 
 	// Determine whether a requested multi-revolution solution exists.
-	local function LambertRevolutionExists {
+	function LambertRevolutionExists {
 		parameter targetT, lambda, revolutions, T00.
 
 		if revolutions <= 0 return true.
@@ -198,7 +198,7 @@
 	}
 
 	// Find Izzo's x for one requested Lambert solution.
-	local function LambertSolveX {
+	function LambertSolveX {
 		parameter T, lambda, revolutions, branch is "left".
 
 		local lambda2 is lambda^2.
