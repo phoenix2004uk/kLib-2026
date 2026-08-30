@@ -1,6 +1,6 @@
 {
-	local OrbitalMechanics is import("OrbitalMechanics-v1").
-	local OrbitalParameters is import("OrbitalParameters-v1").
+	local OrbitalMechanics is import("orbitalMechanics-v1").
+	local OrbitalParameters is import("orbitalParameters-v1").
 	function circularizeAtAp {
 		if apoapsis < 0 {
 			return ApiFail("There is no apoapsis on a hyperbolic trajectory").

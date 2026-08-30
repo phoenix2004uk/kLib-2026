@@ -1,6 +1,6 @@
 // #include "kldr-stub.ks"
 {
-	local OrbitalParameters is import("OrbitalParameters-v1").
+	local OrbitalParameters is import("orbitalParameters-v1").
 	local ANOMALY_TOLERANCE is 1e-9.
 
 	// VisViva equation

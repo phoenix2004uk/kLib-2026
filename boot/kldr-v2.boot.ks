@@ -1,4 +1,5 @@
 wait until ship:unpacked.
+wait 2.
 core:part:getmodule("kOSProcessor"):doevent("Open Terminal").
 set ship:control:pilotmainthrottle to 0.
 sas off.
@@ -9,16 +10,21 @@ clearScreen.
 	// Private constants
 	// =========================================================================
 	local _kDebug is core:tag = "debug".
+	local _kRootParent is "@".
 	local _kLibRoots is list(
 		"0:/klib/",
 		"0:/klib-nrm/",
 		"0:/klib-min/"
 	).
 	local _kMissionRoots is list("0:/missions/").
-	local _kTmpId is "0:/" + core:part:uid.
+	local _kUid is core:part:uid.
+	local _kTmpId is "0:/" + _kUid.
 	local _kTmp is _kTmpId + ".ksm".
 	local _kBestTmp is _kTmpId + "-b.ksm".
 	local _kMapPath is "1:/kldr-map".
+	local _kDmsgLogFile is "0:/dmsg/" + _kUid + "-" + ship:name + ".log".
+	local _kDmsgBufferFile is "1:/dmsg.log".
+	local _kDmsgFSMinSpace is 500.
 
 	// =========================================================================
 	// Private state
@@ -30,11 +36,35 @@ clearScreen.
 	local _kLoaded is lex().
 	local _kParents is lex().
 	local _kChildren is lex().
-	local _kRootParent is "@".
+	local lock _kDmsgBuffered to exists(_kDmsgBufferFile).
+	local _kDmsgArchiveReady is false.
+	local lock _kConnected to homeConnection:isconnected.
 
 	// =========================================================================
 	// Global API
 	// =========================================================================
+	global dmsg is {
+		parameter _kMessage, _kPrint is false.
+
+		if _kPrint {
+			print _kMessage.
+		}
+
+		local _kMet is round(missionTime, 6):tostring.
+		if not _kMet:contains(".") set _kMet to _kMet + ".".
+		set _kMet to (_kMet + "000000"):substring(0, _kMet:find(".") + 7).
+		set _kMessage to "[MET " + _kMet:padleft(14) + "] " + _kMessage:tostring.
+
+		if _kConnected {
+			_kEnsureDmsg().
+			_kFlushDmsg().
+			log _kMessage to _kDmsgLogFile.
+		}
+		else if volume(1):freespace - _kMessage:length > _kDmsgFSMinSpace {
+			log _kMessage to _kDmsgBufferFile.
+		}
+	}.
+
 	global ApiOK is {
 		parameter _kValue, _kMessage is "".
 
@@ -130,6 +160,12 @@ clearScreen.
 	// Boot Loader
 	// =========================================================================
 	function _kBoot {
+		dmsg("[kldr] Boot " + ship:tostring + " tag=" + char(34) + core:tag + char(34) + " at " + time:seconds).
+		if _kDmsgBuffered and _kConnected {
+			_kEnsureDmsg().
+			_kFlushDmsg().
+		}
+
 		local _kMissionName is
 			choose ship:name
 			if _kDebug or core:tag = ""
@@ -151,7 +187,7 @@ clearScreen.
 		}
 
 		if status = "PRELAUNCH" {
-			if not homeConnection:isconnected {
+			if not _kConnected {
 				print "Error! No KSC Connection".
 				shutdown.
 			}
@@ -160,17 +196,34 @@ clearScreen.
 				print "Error! No mission script: " + _kMissionName.
 				shutdown.
 			}
+
+			// BOOT FILE REPLACEMENT HACK - REMOVE THIS BLOCK DURING NORMALIZATION AND MINIFICATION
+			if not _kDebug {
+				local _kBootRoots is list(
+					"0:/boot-nrm/",
+					"0:/boot-min/"
+				).
+				local _kBootName is path(core:bootfilename):name.
+				set _kBootName to _kBootName:substring(0, _kBootName:length - 3).
+				local _kBootLocal is "1:/boot/" + _kBootName.
+				if _kCopyBest(_kBootName, _kBootLocal, _kBootRoots) {
+					set core:bootfilename to
+						"/boot/" + _kBootName
+						+ (choose ".ksm" if exists(_kBootLocal + ".ksm") else ".ks").
+					reboot.
+				}
+			}
 		}
 
 		if _kDebug {
-			if homeConnection:isconnected and exists(_kMissionSource + ".ks") {
+			if _kConnected and exists(_kMissionSource + ".ks") {
 				_kCopySource(_kMissionSource, _kMain).
 			}
 		}
 		else if (status = "PRELAUNCH")
 			or (
 				not _kHasExec(_kMain)
-				and homeConnection:isconnected
+				and _kConnected
 				and exists(_kMissionSource + ".ks")
 			) {
 			_kCopyBest(_kMissionName, _kMain, _kMissionRoots).
@@ -185,6 +238,27 @@ clearScreen.
 	// =========================================================================
 	// Private implementation
 	// =========================================================================
+	function _kEnsureDmsg {
+		if not _kDmsgArchiveReady {
+			if not exists(_kDmsgLogFile) {
+				create(_kDmsgLogFile).
+			}
+			set _kDmsgArchiveReady to true.
+		}
+	}
+
+	function _kFlushDmsg {
+		if not _kDmsgBuffered {
+			return.
+		}
+
+		for _kLine in open(_kDmsgBufferFile):readall {
+			log _kLine to _kDmsgLogFile.
+		}
+
+		deletePath(_kDmsgBufferFile).
+	}
+
 	function _kSaveMap {
 		writeJSON(list(_kGeneration, _kMap), _kMapPath).
 	}
@@ -245,6 +319,7 @@ clearScreen.
 				if _kSize < _kBestSize {
 					movePath(_kTmp, _kBestTmp).
 					set _kBestSize to _kSize.
+					set _kBestSrc to _kSrc.
 					set _kBestCompiled to true.
 				}
 				else {
@@ -301,7 +376,7 @@ clearScreen.
 				// when the archive is available. Since this is a
 				// new boot, the pathname is not cached yet in the
 				// current program context.
-				if _kDebug and homeConnection:isconnected {
+				if _kDebug and _kConnected {
 					if not exists(_kSource + ".ks") {
 						print "Error! No library source: " + _kLibName.
 						shutdown.
@@ -314,7 +389,7 @@ clearScreen.
 						_kSaveMap().
 					}
 				}
-				else if not _kDebug and _kMap[_kLibName] < 0 and homeConnection:isconnected {
+				else if not _kDebug and _kMap[_kLibName] < 0 and _kConnected {
 					if _kCopyBest(_kLibName, _kLocal, _kLibRoots) {
 						set _kMap[_kLibName] to -_kMap[_kLibName].
 						_kSaveMap().
@@ -329,7 +404,7 @@ clearScreen.
 			_kMap:remove(_kLibName).
 		}
 
-		if not homeConnection:isconnected {
+		if not _kConnected {
 			print "Error! Missing library: " + _kLibName.
 			print "No KSC Connection".
 			shutdown.
