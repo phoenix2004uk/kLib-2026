@@ -1,5 +1,5 @@
 wait until ship:unpacked.
-wait 2.
+wait 1.
 core:part:getmodule("kOSProcessor"):doevent("Open Terminal").
 set ship:control:pilotmainthrottle to 0.
 sas off.
@@ -106,8 +106,7 @@ clearScreen.
 		}
 
 		if _kLoadStack:contains(_kLibName) {
-			print "Error! Circular import: " + _kLibName.
-			shutdown.
+			_kPanic("Error! Circular import: " + _kLibName).
 		}
 
 		local _kPath is _kEnsureLib(_kLibName).
@@ -118,8 +117,7 @@ clearScreen.
 		_kLoadStack:pop().
 
 		if _kExportStack:length <> _kExportDepth + 1 {
-			print "Error! Invalid export: " + _kLibName.
-			shutdown.
+			_kPanic("Error! Invalid export: " + _kLibName).
 		}
 
 		local _kObject is _kExportStack:pop().
@@ -161,10 +159,11 @@ clearScreen.
 	// =========================================================================
 	function _kBoot {
 		dmsg("[kldr] Boot " + ship:tostring + " tag=" + char(34) + core:tag + char(34) + " at " + time:seconds).
-		if _kDmsgBuffered and _kConnected {
-			_kEnsureDmsg().
-			_kFlushDmsg().
-		}
+		// ensure/flush check is not required if we keep the above `dmsg`
+		// if _kDmsgBuffered and _kConnected {
+		// 	_kEnsureDmsg().
+		// 	_kFlushDmsg().
+		// }
 
 		local _kMissionName is
 			choose ship:name
@@ -188,13 +187,11 @@ clearScreen.
 
 		if status = "PRELAUNCH" {
 			if not _kConnected {
-				print "Error! No KSC Connection".
-				shutdown.
+				_kPanic("Error! No KSC Connection").
 			}
 
 			if not exists(_kMissionSource + ".ks") {
-				print "Error! No mission script: " + _kMissionName.
-				shutdown.
+				_kPanic("Error! No mission script: " + _kMissionName).
 			}
 
 			// BOOT FILE REPLACEMENT HACK - REMOVE THIS BLOCK DURING NORMALIZATION AND MINIFICATION
@@ -230,14 +227,19 @@ clearScreen.
 		}
 
 		if not _kHasExec(_kMain) {
-			print "Error! No local mission script".
-			shutdown.
+			_kPanic("Error! No local mission script").
 		}
 	}
 
 	// =========================================================================
 	// Private implementation
 	// =========================================================================
+	function _kPanic {
+		parameter _kMessage.
+		dmsg(_kMessage, true).
+		shutdown.
+	}
+
 	function _kEnsureDmsg {
 		if not _kDmsgArchiveReady {
 			if not exists(_kDmsgLogFile) {
@@ -378,8 +380,7 @@ clearScreen.
 				// current program context.
 				if _kDebug and _kConnected {
 					if not exists(_kSource + ".ks") {
-						print "Error! No library source: " + _kLibName.
-						shutdown.
+						_kPanic("Error! No library source: " + _kLibName).
 					}
 
 					_kCopySource(_kSource, _kLocal).
@@ -405,14 +406,11 @@ clearScreen.
 		}
 
 		if not _kConnected {
-			print "Error! Missing library: " + _kLibName.
-			print "No KSC Connection".
-			shutdown.
+			_kPanic("Error! Missing library: " + _kLibName + char(10) + "No KSC Connection").
 		}
 
 		if _kDebug and not exists(_kSource + ".ks") {
-			print "Error! No library source: " + _kLibName.
-			shutdown.
+			_kPanic("Error! No library source: " + _kLibName).
 		}
 
 		set _kGeneration to _kGeneration + 1.
@@ -427,8 +425,7 @@ clearScreen.
 		}
 		else if not _kCopyBest(_kLibName, _kLocal, _kLibRoots) {
 			_kMap:remove(_kLibName).
-			print "Error! No library: " + _kLibName.
-			shutdown.
+			_kPanic("Error! No library: " + _kLibName).
 		}
 
 		_kSaveMap().
