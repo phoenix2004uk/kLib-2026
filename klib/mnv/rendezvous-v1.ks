@@ -46,7 +46,7 @@
 		// Additional safe distance required inside the current SOI radius, in metres.
 		"soiClearance", 1e3,
 		// Whether each evaluated search cell is written to a porkchop data file.
-		"porkchop", true,
+		"porkchop", false,
 		// Number of evaluated cells between console progress updates; 0 disables updates.
 		"progressEvery", 1000,
 		// Maximum phase distance, per axis, that the final refinement may continue beyond a retained-cell boundary while dV keeps improving.

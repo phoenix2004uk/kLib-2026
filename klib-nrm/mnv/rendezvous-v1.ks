@@ -1,45 +1,42 @@
 {
-	local OrbitalMechanics is import("orbitalMechanics-v1").
-	local OrbitalParameters is import("orbitalParameters-v1").
-	local solveLambert is import("mnv/solveLambert-v1").
-	local altitudeSafety is import("altitudeSafety-v1").
-	local velocityChangeToNode is import("mnv/velocityChangeToNode-v1").
-	local createConfig is import("util/createConfig-v1").
-	local PHASE_TIME_BISECTION_ITERATIONS is 40.
-	local LAMBERT_DIRECTIONS is list("short", "long").
-	local LAMBERT_BRANCHES is list("left", "right").
-	local DEFAULT_CONFIG is lex(
-		"burnEta", 60,
-		"depOffset", 900,
-		"depPeriodFactor", 0.1,
-		"patchMargin", 60,
-		"depOrbits", 2,
-		"tofMin", 60,
-		"tofMinFactor", 0.5,
-		"tofWindowFactor", 1.5,
-		"maxRevs", 2,
-		"phaseSizes", list(15, 3, 0.5, 0.1, 0.01),
-		"phaseSamples", 100,
-		"retainMax", 40,
-		"retainFraction", 0.25,
-		"retainFamily", 4,
-		"peClearance", 1e3,
-		"soiClearance", 1e3,
-		"porkchop", true,
-		"progressEvery", 1000,
-		"chaseDegrees", 5,
-		"progressStart", {parameter phaseSize. print "Evaluating initial phase grid at " + phaseSize + "°".},
-		"progressLevel", {parameter level, phaseSize. print "Evaluating phase grid level " + level + " at " + phaseSize + "°". },
-		"progressCell", {parameter level, evaluated. print "Level " + level + ": " + evaluated + " evaluated". },
-		"progressChase", {parameter phaseCellSize, maxIterations. print "Chasing final refinement boundary".}
-	).
+	local OrbitalMechanics is import("orbitalMechanics-v1"),
+		OrbitalParameters is import("orbitalParameters-v1"),
+		solveLambert is import("mnv/solveLambert-v1"),
+		altitudeSafety is import("altitudeSafety-v1"),
+		velocityChangeToNode is import("mnv/velocityChangeToNode-v1"),
+		createConfig is import("util/createConfig-v1"),
+		PHASE_TIME_BISECTION_ITERATIONS is 40,
+		LAMBERT_DIRECTIONS is list("short", "long"),
+		LAMBERT_BRANCHES is list("left", "right"),
+		DEFAULT_CONFIG is lex(
+			"burnEta", 60,
+			"depOffset", 900,
+			"depPeriodFactor", 0.1,
+			"patchMargin", 60,
+			"depOrbits", 2,
+			"tofMin", 60,
+			"tofMinFactor", 0.5,
+			"tofWindowFactor", 1.5,
+			"maxRevs", 2,
+			"phaseSizes", list(15, 3, 0.5, 0.1, 0.01),
+			"phaseSamples", 100,
+			"retainMax", 40,
+			"retainFraction", 0.25,
+			"retainFamily", 4,
+			"peClearance", 1e3,
+			"soiClearance", 1e3,
+			"porkchop", false,
+			"progressEvery", 1000,
+			"chaseDegrees", 5,
+			"progressStart", {parameter phaseSize. print "Evaluating initial phase grid at " + phaseSize + "°".},
+			"progressLevel", {parameter level, phaseSize. print "Evaluating phase grid level " + level + " at " + phaseSize + "°". },
+			"progressCell", {parameter level, evaluated. print "Level " + level + ": " + evaluated + " evaluated". },
+			"progressChase", {parameter phaseCellSize, maxIterations. print "Chasing final refinement boundary".}
+		).
 	function trueAnomalyOfState {
 		parameter positionVector, eccentricityVector, eccentricity, angularMomentumVector, signed is false.
 		if eccentricity < 1e-12 return 0.
-		local trueAnomaly is arccos(max(
-			-1,
-			min(1, vdot(eccentricityVector, positionVector) / (eccentricity * positionVector:mag))
-		)).
+		local trueAnomaly is arccos(max(-1, min(1, vdot(eccentricityVector, positionVector) / (eccentricity * positionVector:mag)))).
 		if vdot(-vcrs(eccentricityVector, positionVector), angularMomentumVector) < 0 {
 			if signed return -trueAnomaly.
 			return 360 - trueAnomaly.
@@ -48,44 +45,42 @@
 	}
 	function getArcRadii {
 		parameter departurePosition, arrivalPosition, transferDepartureVelocity, tof, targetBody.
-		local angularMomentumVector is -vcrs(departurePosition, transferDepartureVelocity).
-		local eccentricityVector is (
-			-vcrs(transferDepartureVelocity, angularMomentumVector) / targetBody:mu
-		) - departurePosition:normalized.
-		local transferEccentricity is eccentricityVector:mag.
-		local semilatusRectum is angularMomentumVector:mag^2 / targetBody:mu.
-		local periapsisRadius is semilatusRectum / (1 + transferEccentricity).
-		local minimumArcRadius is min(departurePosition:mag, arrivalPosition:mag).
-		local maximumArcRadius is max(departurePosition:mag, arrivalPosition:mag).
-		local departureTrueAnomaly is trueAnomalyOfState(
-			departurePosition,
-			eccentricityVector,
-			transferEccentricity,
-			angularMomentumVector,
-			transferEccentricity >= 1
-		).
-		if transferEccentricity < 1 {
-			local transferSemimajorAxis is semilatusRectum / (1 - transferEccentricity^2).
-			local transferPeriod is OrbitalMechanics:P(
-				transferSemimajorAxis,
-				targetBody
+		local angularMomentumVector is -vcrs(departurePosition, transferDepartureVelocity),
+			eccentricityVector is (-vcrs(transferDepartureVelocity, angularMomentumVector) / targetBody:mu) - departurePosition:normalized,
+			transferEccentricity is eccentricityVector:mag,
+			semilatusRectum is angularMomentumVector:mag^2 / targetBody:mu,
+			periapsisRadius is semilatusRectum / (1 + transferEccentricity),
+			minimumArcRadius is min(departurePosition:mag, arrivalPosition:mag),
+			maximumArcRadius is max(departurePosition:mag, arrivalPosition:mag),
+			departureTrueAnomaly is trueAnomalyOfState(
+				departurePosition,
+				eccentricityVector,
+				transferEccentricity,
+				angularMomentumVector,
+				transferEccentricity >= 1
 			).
-			local apoapsisRadius is semilatusRectum / (1 - transferEccentricity).
+		if transferEccentricity < 1 {
+			local transferSemimajorAxis is semilatusRectum / (1 - transferEccentricity^2),
+				transferPeriod is OrbitalMechanics:P(
+					transferSemimajorAxis,
+					targetBody
+				),
+				apoapsisRadius is semilatusRectum / (1 - transferEccentricity).
 			if tof >= transferPeriod {
 				set minimumArcRadius to min(minimumArcRadius, periapsisRadius).
 				set maximumArcRadius to max(maximumArcRadius, apoapsisRadius).
 			}
 			else {
 				local etaPeriapsis is OrbitalMechanics:etaV(
-					0,
-					transferPeriod,
-					departureTrueAnomaly,
-					transferEccentricity
-				).
-				local etaApoapsis is mod(
-					etaPeriapsis + transferPeriod / 2,
-					transferPeriod
-				).
+						0,
+						transferPeriod,
+						departureTrueAnomaly,
+						transferEccentricity
+					),
+					etaApoapsis is mod(
+						etaPeriapsis + transferPeriod / 2,
+						transferPeriod
+					).
 				if etaPeriapsis <= tof {
 					set minimumArcRadius to min(minimumArcRadius, periapsisRadius).
 				}
@@ -127,8 +122,8 @@
 	}
 	function createSearchCandidate {
 		parameter cell, departureUT, arrivalUT, shipState, targetState, transferResult.
-		local dvDeparture is (transferResult:departureVelocity - shipState:v):mag.
-		local dvArrival is (targetState:v - transferResult:arrivalVelocity):mag.
+		local dvDeparture is (transferResult:departureVelocity - shipState:v):mag,
+			dvArrival is (targetState:v - transferResult:arrivalVelocity):mag.
 		return lex(
 			"v", true,
 			"c", cell,
@@ -150,25 +145,20 @@
 	}
 	function createOrbitSnapshotFromState {
 		parameter targetOrbit, referenceUT, positionVector, velocityVector, transitionUT is false.
-		local targetBody is targetOrbit:body.
-		local angularMomentumVector is -vcrs(positionVector, velocityVector).
-		local angularMomentumMag is angularMomentumVector:mag.
-		local eccentricityVector is (
-			-vcrs(velocityVector, angularMomentumVector) / targetBody:mu
-		) - positionVector:normalized.
-		local eccentricity is eccentricityVector:mag.
-		local trueAnomaly is trueAnomalyOfState(
-			positionVector,
-			eccentricityVector,
-			eccentricity,
-			angularMomentumVector,
-			eccentricity >= 1
-		).
-		local radialVector is positionVector:normalized.
-		local transverseVector is (
-			velocityVector
-			- radialVector * vdot(velocityVector, radialVector)
-		):normalized.
+		local targetBody is targetOrbit:body,
+			angularMomentumVector is -vcrs(positionVector, velocityVector),
+			angularMomentumMag is angularMomentumVector:mag,
+			eccentricityVector is (-vcrs(velocityVector, angularMomentumVector) / targetBody:mu) - positionVector:normalized,
+			eccentricity is eccentricityVector:mag,
+			trueAnomaly is trueAnomalyOfState(
+				positionVector,
+				eccentricityVector,
+				eccentricity,
+				angularMomentumVector,
+				eccentricity >= 1
+			),
+			radialVector is positionVector:normalized,
+			transverseVector is (velocityVector - radialVector * vdot(velocityVector, radialVector)):normalized.
 		return lex(
 			"t", referenceUT,
 			"b", targetBody,
@@ -188,9 +178,9 @@
 	}
 	function createOrbitableSnapshot {
 		parameter targetOrbitable, referenceUT.
-		local targetOrbit is targetOrbitable:orbit.
-		local targetBody is targetOrbit:body.
-		local transitionUT is false.
+		local targetOrbit is targetOrbitable:orbit,
+			targetBody is targetOrbit:body,
+			transitionUT is false.
 		if targetOrbit:hasnextpatch {
 			set transitionUT to referenceUT + targetOrbit:nextpatcheta.
 		}
@@ -204,13 +194,13 @@
 	}
 	function createOrbitSnapshot {
 		parameter targetOrbit.
-		local targetBody is targetOrbit:body.
-		local sampleUTBefore is time:seconds.
-		local positionVector is targetOrbit:position - targetBody:position.
-		local velocityVector is targetOrbit:velocity:orbit.
-		local sampleUTAfter is time:seconds.
-		local referenceUT is (sampleUTBefore + sampleUTAfter) / 2.
-		local transitionUT is false.
+		local targetBody is targetOrbit:body,
+			sampleUTBefore is time:seconds,
+			positionVector is targetOrbit:position - targetBody:position,
+			velocityVector is targetOrbit:velocity:orbit,
+			sampleUTAfter is time:seconds,
+			referenceUT is (sampleUTBefore + sampleUTAfter) / 2,
+			transitionUT is false.
 		if targetOrbit:hasnextpatch {
 			set transitionUT to referenceUT + targetOrbit:nextpatcheta.
 		}
@@ -224,8 +214,7 @@
 	}
 	function phaseToUT {
 		parameter orbitSnapshot, phaseDegrees.
-		if orbitSnapshot:e < 1 return orbitSnapshot:t
-			+ OrbitalMechanics:dtV(
+		if orbitSnapshot:e < 1 return orbitSnapshot:t + OrbitalMechanics:dtV(
 				phaseDegrees,
 				orbitSnapshot:p,
 				orbitSnapshot:v,
@@ -242,11 +231,11 @@
 	function phaseAtUT {
 		parameter orbitSnapshot, ut.
 		if ut <= orbitSnapshot:t return 0.
-		local phaseLow is 0.
-		local phaseHigh is 0.
+		local phaseLow is 0,
+			phaseHigh is 0.
 		if orbitSnapshot:e < 1 {
-			local elapsedTime is ut - orbitSnapshot:t.
-			local upperOrbitCount is ceiling(elapsedTime / orbitSnapshot:p) + 1.
+			local elapsedTime is ut - orbitSnapshot:t,
+				upperOrbitCount is ceiling(elapsedTime / orbitSnapshot:p) + 1.
 			set phaseHigh to upperOrbitCount * 360.
 		}
 		else {
@@ -256,8 +245,8 @@
 		until iteration >= PHASE_TIME_BISECTION_ITERATIONS
 		step { set iteration to iteration + 1. }
 		do {
-			local phaseMid is (phaseLow + phaseHigh) / 2.
-			local phaseUT is phaseToUT(orbitSnapshot, phaseMid).
+			local phaseMid is (phaseLow + phaseHigh) / 2,
+				phaseUT is phaseToUT(orbitSnapshot, phaseMid).
 			if phaseUT < ut set phaseLow to phaseMid.
 			else set phaseHigh to phaseMid.
 		}
@@ -272,11 +261,10 @@
 				shipSnapshot:p * cfg:depPeriodFactor
 			).
 		}
-		local earliestDepartureUT is shipSnapshot:t + departureSearchOffset.
-		local latestDepartureUT is 0.
+		local earliestDepartureUT is shipSnapshot:t + departureSearchOffset,
+			latestDepartureUT is 0.
 		if shipSnapshot:e < 1 {
-			set latestDepartureUT to earliestDepartureUT
-				+ cfg:depOrbits * shipSnapshot:p.
+			set latestDepartureUT to earliestDepartureUT + cfg:depOrbits * shipSnapshot:p.
 			if not shipSnapshot:u:istype("Boolean") {
 				set latestDepartureUT to min(
 					latestDepartureUT,
@@ -298,43 +286,24 @@
 	}
 	function calculateTOFWindow {
 		parameter shipSnapshot, targetSnapshot, departureWindow, cfg.
-		local minAltitude is 0.
-		local maxAltitude is 0.
+		local minAltitude is 0,
+			maxAltitude is 0.
 		if shipSnapshot:e < 1 {
 			set minAltitude to min(shipSnapshot:n, targetSnapshot:n).
 			set maxAltitude to max(shipSnapshot:m, targetSnapshot:m).
 		}
 		else {
-			local departureMinAltitude is (positionAt(ship, departureWindow:n) - body:position):mag - body:radius.
-			local departureMaxAltitude is (positionAt(ship, departureWindow:x) - body:position):mag - body:radius.
-			set minAltitude to min(
-				min(
-					min(
-						shipSnapshot:n,
-						targetSnapshot:n
-					),
-					departureMinAltitude
-				),
-				departureMaxAltitude
-			).
-			set maxAltitude to max(
-				max(
-					targetSnapshot:m,
-					departureMinAltitude
-				),
-				departureMaxAltitude
-			).
+			local departureMinAltitude is (positionAt(ship, departureWindow:n) - body:position):mag - body:radius,
+				departureMaxAltitude is (positionAt(ship, departureWindow:x) - body:position):mag - body:radius.
+			set minAltitude to min(min(min(shipSnapshot:n, targetSnapshot:n), departureMinAltitude), departureMaxAltitude).
+			set maxAltitude to max(max(targetSnapshot:m, departureMinAltitude), departureMaxAltitude).
 		}
-		local refPeriod is OrbitalMechanics:Ph(minAltitude, maxAltitude, body).
-		local refHalfPeriod is refPeriod / 2.
-		local minTof is max(cfg:tofMin, refHalfPeriod * cfg:tofMinFactor).
-		local maxTof is refHalfPeriod * cfg:tofWindowFactor
-			+ cfg:maxRevs * refPeriod.
+		local refPeriod is OrbitalMechanics:Ph(minAltitude, maxAltitude, body),
+			refHalfPeriod is refPeriod / 2,
+			minTof is max(cfg:tofMin, refHalfPeriod * cfg:tofMinFactor),
+			maxTof is refHalfPeriod * cfg:tofWindowFactor + cfg:maxRevs * refPeriod.
 		if not targetSnapshot:u:istype("Boolean") {
-			set maxTof to min(
-				maxTof,
-				targetSnapshot:u - departureWindow:n
-			).
+			set maxTof to min(maxTof, targetSnapshot:u - departureWindow:n).
 		}
 		if maxTof <= minTof return ApiFail("No useful time-of-flight window exists").
 		return ApiOK(lex(
@@ -351,46 +320,30 @@
 	}
 	function getOrbitStateAtPhaseOffset {
 		parameter orbitSnapshot, phaseDegrees.
-		local phaseCos is cos(phaseDegrees).
-		local phaseSin is sin(phaseDegrees).
-		local radialVector is
-			orbitSnapshot:x * phaseCos
-			+ orbitSnapshot:y * phaseSin.
-		local transverseVector is
-			orbitSnapshot:y * phaseCos
-			- orbitSnapshot:x * phaseSin.
-		local trueAnomaly is orbitSnapshot:v + phaseDegrees.
-		local trueAnomalyCos is cos(trueAnomaly).
-		local trueAnomalySin is sin(trueAnomaly).
-		local radius is orbitSnapshot:l
-			/ (
-				1
-				+ orbitSnapshot:e * trueAnomalyCos
-			).
-		local radialVelocity is orbitSnapshot:s
-			* orbitSnapshot:e
-			* trueAnomalySin.
-		local transverseVelocity is orbitSnapshot:s
-			* (
-				1
-				+ orbitSnapshot:e * trueAnomalyCos
-			).
+		local phaseCos is cos(phaseDegrees),
+			phaseSin is sin(phaseDegrees),
+			radialVector is orbitSnapshot:x * phaseCos + orbitSnapshot:y * phaseSin,
+			transverseVector is orbitSnapshot:y * phaseCos - orbitSnapshot:x * phaseSin,
+			trueAnomaly is orbitSnapshot:v + phaseDegrees,
+			trueAnomalyCos is cos(trueAnomaly),
+			trueAnomalySin is sin(trueAnomaly),
+			radius is orbitSnapshot:l / (1 + orbitSnapshot:e * trueAnomalyCos),
+			radialVelocity is orbitSnapshot:s * orbitSnapshot:e * trueAnomalySin,
+			transverseVelocity is orbitSnapshot:s * (1 + orbitSnapshot:e * trueAnomalyCos).
 		return lex(
 			"p", radialVector * radius,
-			"v",
-				radialVector * radialVelocity
-				+ transverseVector * transverseVelocity
+			"v", radialVector * radialVelocity + transverseVector * transverseVelocity
 		).
 	}
 	function evaluateTransfer {
 		parameter cell, shipSnapshot, targetSnapshot,
 			departureWindow, tofWindow, targetPhaseOffset,
 			transferSafetyBounds.
-		local departurePhase is (cell:d:n + cell:d:x) / 2.
-		local arrivalPhase is (cell:a:n + cell:a:x) / 2.
-		local departureUT is phaseToUT(shipSnapshot, departurePhase).
-		local arrivalUT is phaseToUT(targetSnapshot, arrivalPhase).
-		local tof is arrivalUT - departureUT.
+		local departurePhase is (cell:d:n + cell:d:x) / 2,
+			arrivalPhase is (cell:a:n + cell:a:x) / 2,
+			departureUT is phaseToUT(shipSnapshot, departurePhase),
+			arrivalUT is phaseToUT(targetSnapshot, arrivalPhase),
+			tof is arrivalUT - departureUT.
 		if departureUT < departureWindow:n or departureUT > departureWindow:x {
 			return transferInvalid(
 				cell, "Departure is outside the departure window",
@@ -410,23 +363,20 @@
 				departureUT, arrivalUT, tof
 			).
 		}
-		local shipState is getStateAt(ship, departureUT).
-		local targetState is getOrbitStateAtPhaseOffset(
-			targetSnapshot,
-			arrivalPhase + targetPhaseOffset
-		).
-		local departurePosition is shipState:p.
-		local arrivalPosition is targetState:p.
-		local transferResult is solveLambert(
-			departurePosition,
-			arrivalPosition,
-			tof,
-			body:mu,
-			cell:r,
-			cell:v,
-			cell:b,
-			shipSnapshot:z
-		).
+		local shipState is getStateAt(ship, departureUT),
+			targetState is getOrbitStateAtPhaseOffset(targetSnapshot, arrivalPhase + targetPhaseOffset),
+			departurePosition is shipState:p,
+			arrivalPosition is targetState:p,
+			transferResult is solveLambert(
+				departurePosition,
+				arrivalPosition,
+				tof,
+				body:mu,
+				cell:r,
+				cell:v,
+				cell:b,
+				shipSnapshot:z
+			).
 		if not transferResult:valid {
 			return transferInvalid(
 				cell, transferResult:reason,
@@ -456,9 +406,7 @@
 		if candidate:c:v = 0 {
 			return candidate:c:v + ":" + candidate:c:r.
 		}
-		return candidate:c:v
-			+ ":" + candidate:c:r
-			+ ":" + candidate:c:b.
+		return candidate:c:v + ":" + candidate:c:r + ":" + candidate:c:b.
 	}
 	function insertBestCandidate {
 		parameter candidates, candidate, limit.
@@ -506,15 +454,9 @@
 	function finalizeRetention {
 		parameter retentionState, cfg.
 		if retentionState:c = 0 return list().
-		local topCount is max(
-			1,
-			min(
-				cfg:retainMax,
-				floor(retentionState:c * cfg:retainFraction)
-			)
-		).
-		local retained is list().
-		local globalCount is min(topCount, retentionState:g:length).
+		local topCount is max(1, min(cfg:retainMax, floor(retentionState:c * cfg:retainFraction))),
+			retained is list(),
+			globalCount is min(topCount, retentionState:g:length).
 		from { local globalIndex is 0. }
 		until globalIndex >= globalCount
 		step { set globalIndex to globalIndex + 1. }
@@ -644,10 +586,7 @@
 	}
 	function cellCanExpand {
 		parameter cell.
-		return cell:m
-			or cell:n
-			or cell:o
-			or cell:p.
+		return cell:m or cell:n or cell:o or cell:p.
 	}
 	function processLambertFamilies {
 		parameter
@@ -689,8 +628,8 @@
 	}
 	function cellCount {
 		parameter width, resolution.
-		local countExact is width / resolution.
-		local countNearest is round(countExact).
+		local countExact is width / resolution,
+			countNearest is round(countExact).
 		if abs(countExact - countNearest) < 1e-9 {
 			return max(1, countNearest).
 		}
@@ -700,57 +639,43 @@
 		parameter shipSnapshot, targetSnapshot,
 			departureWindow, tofWindow, targetPhaseOffset,
 			transferSafetyBounds, cfg.
-		local evaluationState is createEvaluationState(0, cfg).
-		local departurePhaseMin is phaseAtUT(shipSnapshot, departureWindow:n).
-		local departurePhaseMax is phaseAtUT(shipSnapshot, departureWindow:x).
-		local departurePhaseWidth is departurePhaseMax - departurePhaseMin.
-		local departurePhaseResolution is max(
-			cfg:phaseSizes[0],
-			departurePhaseWidth / cfg:phaseSamples
-		).
-		local departureCount is cellCount(departurePhaseWidth, departurePhaseResolution).
+		local evaluationState is createEvaluationState(0, cfg),
+			departurePhaseMin is phaseAtUT(shipSnapshot, departureWindow:n),
+			departurePhaseMax is phaseAtUT(shipSnapshot, departureWindow:x),
+			departurePhaseWidth is departurePhaseMax - departurePhaseMin,
+			departurePhaseResolution is max(cfg:phaseSizes[0], departurePhaseWidth / cfg:phaseSamples),
+			departureCount is cellCount(departurePhaseWidth, departurePhaseResolution).
 		set departurePhaseResolution to departurePhaseWidth / departureCount.
 		from { local departureIndex is 0. }
 		until departureIndex >= departureCount
 		step { set departureIndex to departureIndex + 1. }
 		do {
-			local phaseDepartureMin is
-				departurePhaseMin + departureIndex * departurePhaseResolution.
-			local phaseDepartureMax is min(
-				phaseDepartureMin + departurePhaseResolution,
-				departurePhaseMax
-			).
-			local phaseDepartureMid is (phaseDepartureMin + phaseDepartureMax) / 2.
-			local departureUT is phaseToUT(shipSnapshot, phaseDepartureMid).
-			local arrivalUTMin is departureUT + tofWindow:n.
-			local arrivalUTMax is departureUT + tofWindow:x.
+			local phaseDepartureMin is departurePhaseMin + departureIndex * departurePhaseResolution,
+				phaseDepartureMax is min(phaseDepartureMin + departurePhaseResolution, departurePhaseMax),
+				phaseDepartureMid is (phaseDepartureMin + phaseDepartureMax) / 2,
+				departureUT is phaseToUT(shipSnapshot, phaseDepartureMid),
+				arrivalUTMin is departureUT + tofWindow:n,
+				arrivalUTMax is departureUT + tofWindow:x.
 			if not targetSnapshot:u:istype("Boolean") {
 				set arrivalUTMax to min(arrivalUTMax, targetSnapshot:u).
 			}
 			if arrivalUTMax > arrivalUTMin {
-				local arrivalPhaseMin is phaseAtUT(targetSnapshot, arrivalUTMin).
-				local arrivalPhaseMax is phaseAtUT(targetSnapshot, arrivalUTMax).
-				local arrivalPhaseWidth is arrivalPhaseMax - arrivalPhaseMin.
-				local arrivalPhaseResolution is max(
-					cfg:phaseSizes[0],
-					arrivalPhaseWidth / cfg:phaseSamples
-				).
-				local arrivalCount is cellCount(arrivalPhaseWidth, arrivalPhaseResolution).
+				local arrivalPhaseMin is phaseAtUT(targetSnapshot, arrivalUTMin),
+					arrivalPhaseMax is phaseAtUT(targetSnapshot, arrivalUTMax),
+					arrivalPhaseWidth is arrivalPhaseMax - arrivalPhaseMin,
+					arrivalPhaseResolution is max(cfg:phaseSizes[0], arrivalPhaseWidth / cfg:phaseSamples),
+					arrivalCount is cellCount(arrivalPhaseWidth, arrivalPhaseResolution).
 				set arrivalPhaseResolution to arrivalPhaseWidth / arrivalCount.
 				from { local arrivalIndex is 0. }
 				until arrivalIndex >= arrivalCount
 				step { set arrivalIndex to arrivalIndex + 1. }
 				do {
-					local phaseArrivalMin is
-						arrivalPhaseMin + arrivalIndex * arrivalPhaseResolution.
-					local phaseArrivalMax is min(
-						phaseArrivalMin + arrivalPhaseResolution,
-						arrivalPhaseMax
-					).
-					local expandDepartureMin is departureIndex > 0.
-					local expandDepartureMax is departureIndex < departureCount - 1.
-					local expandArrivalMin is true.
-					local expandArrivalMax is true.
+					local phaseArrivalMin is arrivalPhaseMin + arrivalIndex * arrivalPhaseResolution,
+						phaseArrivalMax is min(phaseArrivalMin + arrivalPhaseResolution, arrivalPhaseMax),
+						expandDepartureMin is departureIndex > 0,
+						expandDepartureMax is departureIndex < departureCount - 1,
+						expandArrivalMin is true,
+						expandArrivalMax is true.
 					processLambertFamilies(
 						phaseDepartureMin,
 						phaseDepartureMax,
@@ -780,11 +705,11 @@
 			targetPhaseOffset, transferSafetyBounds, cfg.
 		local evaluationState is createEvaluationState(level, cfg).
 		for parentCandidate in parentCandidates {
-			local parentCell is parentCandidate:c.
-			local refineDepartureMin is parentCell:d:n.
-			local refineDepartureMax is parentCell:d:x.
-			local refineArrivalMin is parentCell:a:n.
-			local refineArrivalMax is parentCell:a:x.
+			local parentCell is parentCandidate:c,
+				refineDepartureMin is parentCell:d:n,
+				refineDepartureMax is parentCell:d:x,
+				refineArrivalMin is parentCell:a:n,
+				refineArrivalMax is parentCell:a:x.
 			if level > 1 {
 				if parentCell:m {
 					set refineDepartureMin to refineDepartureMin - phaseCellSize.
@@ -799,47 +724,41 @@
 					set refineArrivalMax to refineArrivalMax + phaseCellSize.
 				}
 			}
-			local departurePhaseWidth is refineDepartureMax - refineDepartureMin.
-			local arrivalPhaseWidth is refineArrivalMax - refineArrivalMin.
-			local departureCount is cellCount(departurePhaseWidth, phaseCellSize).
-			local arrivalCount is cellCount(arrivalPhaseWidth, phaseCellSize).
-			local departureResolution is departurePhaseWidth / departureCount.
-			local arrivalResolution is arrivalPhaseWidth / arrivalCount.
+			local departurePhaseWidth is refineDepartureMax - refineDepartureMin,
+				arrivalPhaseWidth is refineArrivalMax - refineArrivalMin,
+				departureCount is cellCount(departurePhaseWidth, phaseCellSize),
+				arrivalCount is cellCount(arrivalPhaseWidth, phaseCellSize),
+				departureResolution is departurePhaseWidth / departureCount,
+				arrivalResolution is arrivalPhaseWidth / arrivalCount.
 			from { local departureIndex is 0. }
 			until departureIndex >= departureCount
 			step { set departureIndex to departureIndex + 1. }
 			do {
-				local childDepartureMin is refineDepartureMin + departureIndex * departureResolution.
-				local childDepartureMax is min(
-					childDepartureMin + departureResolution,
-					refineDepartureMax
-				).
+				local childDepartureMin is refineDepartureMin + departureIndex * departureResolution,
+					childDepartureMax is min(childDepartureMin + departureResolution, refineDepartureMax).
 				from { local arrivalIndex is 0. }
 				until arrivalIndex >= arrivalCount
 				step { set arrivalIndex to arrivalIndex + 1. }
 				do {
-					local childArrivalMin is refineArrivalMin + arrivalIndex * arrivalResolution.
-					local childArrivalMax is min(
-						childArrivalMin + arrivalResolution,
-						refineArrivalMax
-					).
-					local expandDepartureMin is parentCell:m and departureIndex = 0.
-					local expandDepartureMax is parentCell:n and departureIndex = departureCount - 1.
-					local expandArrivalMin is parentCell:o and arrivalIndex = 0.
-					local expandArrivalMax is parentCell:p and arrivalIndex = arrivalCount - 1.
-					local childCell is createCell(
-						childDepartureMin,
-						childDepartureMax,
-						childArrivalMin,
-						childArrivalMax,
-						parentCell:v,
-						parentCell:r,
-						parentCell:b,
-						expandDepartureMin,
-						expandDepartureMax,
-						expandArrivalMin,
-						expandArrivalMax
-					).
+					local childArrivalMin is refineArrivalMin + arrivalIndex * arrivalResolution,
+						childArrivalMax is min(childArrivalMin + arrivalResolution, refineArrivalMax),
+						expandDepartureMin is parentCell:m and departureIndex = 0,
+						expandDepartureMax is parentCell:n and departureIndex = departureCount - 1,
+						expandArrivalMin is parentCell:o and arrivalIndex = 0,
+						expandArrivalMax is parentCell:p and arrivalIndex = arrivalCount - 1,
+						childCell is createCell(
+							childDepartureMin,
+							childDepartureMax,
+							childArrivalMin,
+							childArrivalMax,
+							parentCell:v,
+							parentCell:r,
+							parentCell:b,
+							expandDepartureMin,
+							expandDepartureMax,
+							expandArrivalMin,
+							expandArrivalMax
+						).
 					processCell(
 						childCell,
 						evaluationState,
@@ -866,50 +785,51 @@
 		}
 		
 		cfg:progressChase(phaseCellSize, maxIterations).
-		local evaluationState is createEvaluationState("boundary", cfg).
-		local best is candidate.
-		local iterations is 0.
+		local evaluationState is createEvaluationState("boundary", cfg),
+			best is candidate,
+			iterations is 0.
 		until iterations >= maxIterations or not cellCanExpand(best:c) {
-			local cell is best:c.
-			local departureWidth is cell:d:x - cell:d:n.
-			local arrivalWidth is cell:a:x - cell:a:n.
-			local departureOffsets is list(0).
+			local cell is best:c,
+				departureWidth is cell:d:x - cell:d:n,
+				arrivalWidth is cell:a:x - cell:a:n,
+				departureOffsets is list(0).
 			if cell:m departureOffsets:add(-1).
 			if cell:n departureOffsets:add(1).
 			local arrivalOffsets is list(0).
 			if cell:o arrivalOffsets:add(-1).
 			if cell:p arrivalOffsets:add(1).
-			local nextBest is best.
-			local improved is false.
+			local nextBest is best,
+				improved is false.
 			for departureOffset in departureOffsets {
 				for arrivalOffset in arrivalOffsets {
 					if departureOffset <> 0 or arrivalOffset <> 0 {
-						local departureShift is departureOffset * departureWidth.
-						local arrivalShift is arrivalOffset * arrivalWidth.
-						local adjacentCell is createCell(
-							cell:d:n + departureShift,
-							cell:d:x + departureShift,
-							cell:a:n + arrivalShift,
-							cell:a:x + arrivalShift,
-							cell:v,
-							cell:r,
-							cell:b,
-							cell:m and departureOffset <= 0,
-							cell:n and departureOffset >= 0,
-							cell:o and arrivalOffset <= 0,
-							cell:p and arrivalOffset >= 0
-						).
-						local result is processCell(
-							adjacentCell,
-							evaluationState,
-							shipSnapshot,
-							targetSnapshot,
-							departureWindow,
-							tofWindow,
-							targetPhaseOffset,
-							transferSafetyBounds,
-							cfg, false
-						).
+						local departureShift is departureOffset * departureWidth,
+							arrivalShift is arrivalOffset * arrivalWidth,
+							adjacentCell is createCell(
+								cell:d:n + departureShift,
+								cell:d:x + departureShift,
+								cell:a:n + arrivalShift,
+								cell:a:x + arrivalShift,
+								cell:v,
+								cell:r,
+								cell:b,
+								cell:m and departureOffset <= 0,
+								cell:n and departureOffset >= 0,
+								cell:o and arrivalOffset <= 0,
+								cell:p and arrivalOffset >= 0
+							),
+							result is processCell(
+								adjacentCell,
+								evaluationState,
+								shipSnapshot,
+								targetSnapshot,
+								departureWindow,
+								tofWindow,
+								targetPhaseOffset,
+								transferSafetyBounds,
+								cfg,
+								false
+							).
 						if result:v and result:z < nextBest:z {
 							set nextBest to result.
 							set improved to true.
@@ -988,18 +908,15 @@
 	}
 	function refreshTransfer {
 		parameter candidate, targetSnapshot, targetPhaseOffset, transferSafetyBounds.
-		local departureUT is candidate:d.
-		local tof is candidate:t.
-		local arrivalUT is departureUT + tof.
-		local shipState is getStateAt(ship, departureUT).
-		local arrivalPhase is phaseAtUT(targetSnapshot, arrivalUT).
-		local targetState is getOrbitStateAtPhaseOffset(
-			targetSnapshot,
-			arrivalPhase + targetPhaseOffset
-		).
-		local departurePosition is shipState:p.
-		local arrivalPosition is targetState:p.
-		local transferResult is solveLambert(
+		local departureUT is candidate:d,
+			tof is candidate:t,
+			arrivalUT is departureUT + tof,
+			shipState is getStateAt(ship, departureUT),
+			arrivalPhase is phaseAtUT(targetSnapshot, arrivalUT),
+			targetState is getOrbitStateAtPhaseOffset(targetSnapshot, arrivalPhase + targetPhaseOffset),
+			departurePosition is shipState:p,
+			arrivalPosition is targetState:p,
+			transferResult is solveLambert(
 			departurePosition,
 			arrivalPosition,
 			tof,
@@ -1035,18 +952,8 @@
 	}
 	function transferToNodes {
 		parameter candidate.
-		local mnvDeparture is velocityChangeToNode(
-			candidate:d,
-			candidate:s:p,
-			candidate:s:v,
-			candidate:f:departureVelocity
-		).
-		local mnvArrival is velocityChangeToNode(
-			candidate:a,
-			candidate:g:p,
-			candidate:f:arrivalVelocity,
-			candidate:g:v
-		).
+		local mnvDeparture is velocityChangeToNode(candidate:d, candidate:s:p, candidate:s:v, candidate:f:departureVelocity),
+			mnvArrival is velocityChangeToNode(candidate:a, candidate:g:p, candidate:f:arrivalVelocity, candidate:g:v).
 		return lex(
 			"departure", mnvDeparture,
 			"arrival", mnvArrival
@@ -1069,23 +976,20 @@
 		}
 		local configResult is createConfig(DEFAULT_CONFIG, options).
 		if not configResult:ok return configResult.
-		local cfg is configResult:val.
-		local referenceUT is time:seconds.
-		local shipSnapshot is createOrbitableSnapshot(ship, referenceUT).
-		local targetSnapshot is createOrbitSnapshot(targetOrbit).
-		local departureWindowResult is calculateDepartureWindow(shipSnapshot, cfg).
+		local cfg is configResult:val,
+			referenceUT is time:seconds,
+			shipSnapshot is createOrbitableSnapshot(ship, referenceUT),
+			targetSnapshot is createOrbitSnapshot(targetOrbit),
+			departureWindowResult is calculateDepartureWindow(shipSnapshot, cfg).
 		if not departureWindowResult:ok return ApiFail(departureWindowResult:msg).
-		local departureWindow is departureWindowResult:val.
-		local tofWindowResult is calculateTOFWindow(shipSnapshot, targetSnapshot, departureWindow, cfg).
+		local departureWindow is departureWindowResult:val,
+			tofWindowResult is calculateTOFWindow(shipSnapshot, targetSnapshot, departureWindow, cfg).
 		if not tofWindowResult:ok return ApiFail(tofWindowResult:msg).
-		local tofWindow is tofWindowResult:val.
-		local safeRadiusResult is altitudeSafety:radius(body).
+		local tofWindow is tofWindowResult:val,
+			safeRadiusResult is altitudeSafety:radius(body).
 		if not safeRadiusResult:ok return safeRadiusResult.
-		local transferSafetyBounds is lex(
-			"n", safeRadiusResult:val + cfg:peClearance,
-			"x", body:soiradius - cfg:soiClearance
-		).
-		local oldIpu is config:ipu.
+		local transferSafetyBounds is lex("n", safeRadiusResult:val + cfg:peClearance, "x", body:soiradius - cfg:soiClearance),
+			oldIpu is config:ipu.
 		set config:ipu to 2000.
 		local best is adaptiveSearch(
 			shipSnapshot,
