@@ -24,6 +24,25 @@
 		return 2 * constant:pi * sqrt(a^3 / b:mu).
 	}
 
+	// Specific orbital angular momentum from the current physical state.
+	// h = r x v
+	function SpecificOrbitalAngularMomentum {
+		parameter targetOrbitable.
+		local rTarget is targetOrbitable:position - targetOrbitable:body:position.
+		local vTarget is targetOrbitable:velocity:orbit.
+		return vcrs(rTarget, vTarget).
+	}
+
+	// Specific orbital angular momentum from the predicted orbital state at UT.
+	// h = r x v
+	// For vessels remaining in their current SOI.
+	function SpecificOrbitalAngularMomentumAt {
+		parameter targetOrbitable, ut.
+		local rTarget is positionAt(targetOrbitable,ut) - targetOrbitable:body:position.
+		local vTarget is velocityAt(targetOrbitable, ut):orbit.
+		return vcrs(rTarget, vTarget).
+	}
+
 	// returns the eta until the V1 trueanomaly
 	function TrueAnomalyEta {
 		parameter V1,
@@ -155,6 +174,8 @@
 		"Ve", EscapeVelocity@,
 		"P", OrbitalPeriod@,
 		"Ph", { parameter h1, h2, b is body. return OrbitalPeriod(OrbitalParameters:a(h1, h2, b), b). },
+		"h", SpecificOrbitalAngularMomentum@,
+		"hAt", SpecificOrbitalAngularMomentumAt@,
 		"etaV", TrueAnomalyEta@,
 		"dtV", TrueAnomalyArcTime@,
 		"etaAN", TrueAnomalyEtaAN@,

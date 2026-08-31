@@ -3,21 +3,6 @@
 	local OrbitalParameters is import("orbitalParameters-v1").
 	local velocityChangeToNode is import("mnv/velocityChangeToNode-v1").
 
-	function getRelativeInclination {
-		parameter targetOrbitable is target, atTime is time:seconds.
-
-		local rShip is positionAt(ship, atTime) - positionAt(body, atTime).
-		local vShip is velocityAt(ship, atTime):orbit.
-		local rTarget is targetOrbitable:position - body:position.
-		local vTarget is targetOrbitable:velocity:orbit.
-
-		// angular momentum, h = r * v
-		local hShip is vcrs(rShip, vShip).
-		local hTarget is vcrs(rTarget, vTarget).
-
-		return vang(hShip, hTarget).
-	}
-
 	// returns the trueanomaly of the AN and DN nodes
 	// for elliptical orbits, these are wrapped to 0..360
 	// returns a lex containing:
@@ -28,13 +13,9 @@
 		parameter targetOrbitable is target.
 
 		local rShip is ship:position - body:position.
-		local vShip is ship:velocity:orbit.
-		local rTarget is targetOrbitable:position - body:position.
-		local vTarget is targetOrbitable:velocity:orbit.
-
-		// angular momentum, h = r * v
-		local hShip is vcrs(rShip, vShip).
-		local hTarget is vcrs(rTarget, vTarget).
+		// angular momentum
+		local hShip is OrbitalMechanics:h(ship).
+		local hTarget is OrbitalMechanics:h(targetOrbitable).
 
 		// line of nodes
 		local vNodes is vcrs(hShip, hTarget):normalized.
@@ -96,7 +77,8 @@
 	function matchInclination {
 		parameter targetOrbitable is target, whichNode is "first", thetaLim is 1e-2.
 
-		local theta is getRelativeInclination(targetOrbitable).
+		// angle between specific orbital angular momentum vectors (orbit normals)
+		local theta is vang(OrbitalMechanics:h(ship), OrbitalMechanics:h(targetOrbitable)).
 		if theta < thetaLim {
 			local mnv is node(time:seconds, 0, 0, 0).
 			return ApiOK(mnv, "Relative inclination is within limit ("+round(thetaLim,4)+"): " + round(theta,4)).
@@ -125,10 +107,10 @@
 			set etaNextNode to OrbitalMechanics:etaVh(nodeTrueAnomaly).
 		}
 		local timeNextNode is time:seconds + etaNextNode.
-		if selectedNode = "DN" set theta to -theta.
-
 		local futureShipRaw is positionAt(ship, timeNextNode).
 		local shipVelocityAtNode is velocityAt(ship, timeNextNode):orbit.
+
+		if selectedNode = "DN" set theta to -theta.
 
 		local vecRadial is (futureShipRaw - body:position):normalized. // true body-radial direction
 		local rotatedVelocityVector is angleAxis(theta, vecRadial) * shipVelocityAtNode.
