@@ -1,4 +1,3 @@
-// #include "kldr-stub.ks"
 {
 	local math is import("math-v1").
 

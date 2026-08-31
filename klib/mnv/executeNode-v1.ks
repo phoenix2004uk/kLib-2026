@@ -54,10 +54,6 @@
 
 		local halfBurnDuration is burnDuration(mnv:deltav:mag/2).
 		local leadDuration is halfBurnDuration + leadTime.
-		
-		print mnv:deltav:mag.
-		print halfBurnDuration.
-		print mnv:eta - leadDuration.
 
 		warpTo(time:seconds + mnv:eta - leadDuration).
 	}

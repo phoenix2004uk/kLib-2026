@@ -1,4 +1,3 @@
-// #include "kldr-stub.ks"
 {
 	local printLn is import("printLn-v1"):printLn.
 	local autostage is import("staging-v1"):autostage.
@@ -44,7 +43,7 @@
 		set pidThrottle:setpoint to 75.
 
 		local lock currQ to ship:q * constant:ATMtokPa.
-		local maxQ is ship:q * constant:ATMtokPa.
+		local maxQ is 0.
 
 		until apoapsis >= apTarget {
 			set maxQ to max(maxQ, currQ).

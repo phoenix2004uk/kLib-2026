@@ -1,4 +1,3 @@
-// #include "kldr-stub.ks"
 {
 	function safestage {
 		stage.

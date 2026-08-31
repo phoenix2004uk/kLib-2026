@@ -1,1 +1,1 @@
-{export({parameter Z,Y,X,T. local S is X:normalized. local P is -vcrs(Y:normalized,S):normalized. local O is T-X. return node(Z,vdot(O,vcrs(P,S):normalized),vdot(O,P),vdot(O,S)).}).}
+{export({parameter Z,Y,X,T. local S is X:normalized,P is -vcrs(Y:normalized,S):normalized,O is T-X. return node(Z,vdot(O,vcrs(P,S):normalized),vdot(O,P),vdot(O,S)).}).}

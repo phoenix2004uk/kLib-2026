@@ -1,1 +1,1 @@
-{function A{stage. wait until stage:ready.}export(lex("safestage",A@,"autostage",{local Z is 1.until not Z{set Z to 0.for Y in ship:engines if(Y:flameout){A().set Z to 1.break.}}},"stageUntil",{parameter Z. lock throttle to 0.until stage:number=0 or stage:number<=Z{A().}wait 0.1.})).}
+{function A{stage. wait until stage:ready.}export(lex("safestage",A@,"autostage",{local Z is 1. until not Z{set Z to 0. for Y in ship:engines if(Y:flameout){A().set Z to 1. break.}}},"stageUntil",{parameter Z. lock throttle to 0. until stage:number=0 or stage:number<=Z{A().}wait 0.1.})).}
