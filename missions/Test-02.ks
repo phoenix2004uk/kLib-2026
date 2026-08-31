@@ -1,8 +1,21 @@
 local rendezvous is import("mnv/rendezvous-v1").
+local printOrbit is import("util/printOrbit-v1").
 clearScreen.
 
-unset target.
+dmsg("Print Orbit Info for: ship").
+printOrbit:print(ship, {parameter line. dmsg("[Orbit Info] " + line, true).}).
+dmsg("Print Orbit Info for: orbit").
+printOrbit:print(orbit, {parameter line. dmsg("[Orbit Info] " + line, true).}).
+dmsg("Print Orbit Info for: Kerbin").
+printOrbit:print(Kerbin, {parameter line. dmsg("[Orbit Info] " + line, true).}).
+dmsg("Print Orbit Info for: Kerbin:orbit").
+printOrbit:print(Kerbin:orbit, {parameter line. dmsg("[Orbit Info] " + line, true).}).
+dmsg("Print Orbit Info for: createOrbit(0,1,0,0,0,0,0,body)").
+printOrbit:print(createOrbit(0,1,0,0,0,0,0,body), {parameter line. dmsg("[Orbit Info] " + line, true).}).
+
+set target to "".
 wait 1.
+wait until not hasTarget.
 wait until hasTarget.
 until not hasNode {
 	remove nextNode.

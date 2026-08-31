@@ -46,7 +46,7 @@
 		local targetBody is selectBodyResult:val,
 			targetBodyName is targetBody:name.
 		if not MAX_TERRAIN_HEIGHTS:haskey(targetBodyName) return ApiFail(targetBodyQuery:tostring + " does not have a known maximum terrain height").
-		return ApiOK(max(choose targetBody:atm:height if includeAtmosphereHeight and targetBody:atm:exists else 0, maxTerrainHeight is MAX_TERRAIN_HEIGHTS[targetBodyName])).
+		return ApiOK(max(choose targetBody:atm:height if includeAtmosphereHeight and targetBody:atm:exists else 0, MAX_TERRAIN_HEIGHTS[targetBodyName])).
 	}
 	export(lex(
 		"altitude", getSafeAltitude@,
