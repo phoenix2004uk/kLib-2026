@@ -4,9 +4,7 @@
 	local awaitSteering is import("steering-v1"):awaitSteering.
 
 	local CONTROL_INTERVAL is 0.1.
-	local THROTTLE_STEP is 0.01.
-	local VERTICAL_SPEED_TOLERANCE is 0.5.
-
+	local VERTICAL_RESPONSE_TIME is 1.
 	local HIGH_DESCENT_SPEED is -60.
 	local DESCENT_STEPS is list(
 		list(5000, -50),
@@ -38,24 +36,34 @@
 		return targetSpeed.
 	}
 
-	local function adjustDescentThrottle {
-		parameter wantedThrottle, targetSpeed.
+	local function descentThrottle {
+		parameter targetSpeed.
 
-		if verticalSpeed < targetSpeed - VERTICAL_SPEED_TOLERANCE {
-			return min(1, wantedThrottle + THROTTLE_STEP).
-		}
-		if verticalSpeed > targetSpeed + VERTICAL_SPEED_TOLERANCE {
-			return max(0, wantedThrottle - THROTTLE_STEP).
-		}
-		return wantedThrottle.
+		if ship:availableThrust <= 0 return 0.
+
+		local gravity is body:mu / (body:radius + altitude)^2.
+		local maxAcceleration is ship:availableThrust / ship:mass.
+		local verticalThrustFraction is max(
+			0.01,
+			vdot(ship:facing:foreVector, up:vector)
+		).
+		local correctionAcceleration is (targetSpeed - verticalSpeed) / VERTICAL_RESPONSE_TIME.
+
+		return max(
+			0,
+			min(
+				1,
+				(gravity + correctionAcceleration) / (maxAcceleration * verticalThrustFraction)
+			)
+		).
 	}
 
-	local function descentComplete {
+	local function surfaceContact {
 		return status = "LANDED" or status = "SPLASHED".
 	}
 
 	local function displayDescent {
-		parameter phase, targetSpeed, wantedThrottle.
+		parameter phase, targetSpeed, wantedThrottle, targetGroundSpeed is 0.
 
 		printLn("Descent:        " + phase, 0).
 		printLn("Radar altitude: " + round(alt:radar, 1) + " m", 1).
@@ -63,7 +71,7 @@
 		printLn("Vertical speed: " + round(verticalSpeed, 1) + " m/s", 3).
 		printLn("Target speed:   " + round(targetSpeed, 1) + " m/s", 4).
 		printLn("Ground speed:   " + round(groundSpeed, 1) + " m/s", 5).
-		printLn("Surface speed:  " + round(ship:velocity:surface:mag, 1) + " m/s", 6).
+		printLn("Ground target:  " + round(targetGroundSpeed, 1) + " m/s", 6).
 		printLn("Throttle:       " + round(wantedThrottle * 100, 0) + "%", 7).
 		printLn("Status:         " + status, 8).
 	}
@@ -81,11 +89,12 @@
 	}
 
 	function descent {
-		parameter deorbitPeriapsis is -100,
-			horizontalBrakeAltitude is 200,
+		parameter deorbitGroundSpeed is 250,
+			horizontalBrakeAltitude is 1000,
 			horizontalSpeedLimit is 1,
-			landingAltitude is 10,
-			landingSpeed is 4.
+			landingAltitude is 20,
+			landingSpeed is 4,
+			impactSpeedLimit is 10.
 
 		local wantedThrottle is 0.
 		local targetSpeed is 0.
@@ -99,86 +108,95 @@
 			warpTo(time:seconds + eta:periapsis - 30).
 		}
 
+		sas off.
 		lock steering to srfRetrograde.
 		awaitSteering().
 		wait until eta:periapsis <= 1.
 
-		// Only burn enough to ensure the resulting orbit intersects the surface.
-		logDescent("deorbit burn", targetSpeed).
+		// Cancel most, but not all, horizontal velocity.
 		set wantedThrottle to 1.
-		until obt:periapsis <= deorbitPeriapsis or descentComplete() {
-			displayDescent("Deorbit burn", targetSpeed, wantedThrottle).
+		logDescent("deorbit burn", targetSpeed).
+
+		until (groundSpeed <= deorbitGroundSpeed and obt:periapsis < 0) or surfaceContact() {
+
+			displayDescent("Deorbit burn", targetSpeed, wantedThrottle, deorbitGroundSpeed).
 			autostage().
 			wait CONTROL_INTERVAL.
 		}
 
-		// Descend on surface-retrograde while progressively reducing
-		// the allowed vertical speed as terrain approaches.
-		set wantedThrottle to 0.
-		lock steering to descentVector(horizontalSpeedLimit).
-		set targetSpeed to descentSpeedAtAltitude(alt:radar).
-		logDescent("controlled descent", targetSpeed).
-
-		until alt:radar <= horizontalBrakeAltitude or descentComplete() {
+		if not surfaceContact() {
+			// Continue bleeding horizontal velocity while controlling descent rate.
+			set wantedThrottle to 0.
+			lock steering to descentVector(horizontalSpeedLimit).
 			set targetSpeed to descentSpeedAtAltitude(alt:radar).
-			set wantedThrottle to adjustDescentThrottle(
-				wantedThrottle,
-				targetSpeed
-			).
+			logDescent("controlled descent", targetSpeed).
 
-			displayDescent("Controlled descent", targetSpeed, wantedThrottle).
-			autostage().
-			wait CONTROL_INTERVAL.
-		}
+			until alt:radar <= horizontalBrakeAltitude or surfaceContact() {
+				set targetSpeed to descentSpeedAtAltitude(alt:radar).
+				set wantedThrottle to descentThrottle(targetSpeed).
 
-		// Close to the surface, finish cancelling horizontal velocity.
-		gear on.
-		set targetSpeed to descentSpeedAtAltitude(alt:radar).
-		logDescent("horizontal braking", targetSpeed).
-
-		until groundSpeed <= horizontalSpeedLimit or descentComplete() {
-			set targetSpeed to descentSpeedAtAltitude(alt:radar).
-			set wantedThrottle to adjustDescentThrottle(
-				wantedThrottle,
-				targetSpeed
-			).
-
-			displayDescent("Horizontal braking", targetSpeed, wantedThrottle).
-			autostage().
-			wait CONTROL_INTERVAL.
-		}
-
-		// Horizontal velocity is gone; stay upright and continue following
-		// the altitude steps until the final landing speed.
-		lock steering to up.
-		set targetSpeed to descentSpeedAtAltitude(alt:radar).
-		logDescent("vertical landing", targetSpeed).
-
-		until descentComplete() {
-			set targetSpeed to descentSpeedAtAltitude(alt:radar).
-			if alt:radar <= landingAltitude {
-				set targetSpeed to -abs(landingSpeed).
+				displayDescent("Controlled descent", targetSpeed, wantedThrottle, horizontalSpeedLimit).
+				autostage().
+				wait CONTROL_INTERVAL.
 			}
-
-			set wantedThrottle to adjustDescentThrottle(
-				wantedThrottle,
-				targetSpeed
-			).
-
-			displayDescent("Vertical landing", targetSpeed, wantedThrottle).
-			autostage().
-			wait CONTROL_INTERVAL.
 		}
 
-		set wantedThrottle to 0.
-		displayDescent("Complete", 0, wantedThrottle).
-		logDescent("complete", 0).
+		if not surfaceContact() {
+			// From here the priority is removing the remaining horizontal speed.
+			gear on.
+			set targetSpeed to descentSpeedAtAltitude(alt:radar).
+			logDescent("horizontal braking", targetSpeed).
 
-		wait 0.
+			until groundSpeed <= horizontalSpeedLimit or surfaceContact() {
+				set targetSpeed to descentSpeedAtAltitude(alt:radar).
+				set wantedThrottle to descentThrottle(targetSpeed).
+
+				displayDescent("Horizontal braking", targetSpeed, wantedThrottle, horizontalSpeedLimit).
+				autostage().
+				wait CONTROL_INTERVAL.
+			}
+		}
+
+		if not surfaceContact() {
+			// Horizontal velocity is gone; descend upright.
+			lock steering to up.
+			logDescent("vertical landing", targetSpeed).
+
+			until surfaceContact() {
+				set targetSpeed to descentSpeedAtAltitude(alt:radar).
+				if alt:radar <= landingAltitude {
+					set targetSpeed to -abs(landingSpeed).
+				}
+
+				set wantedThrottle to descentThrottle(targetSpeed).
+
+				displayDescent("Vertical landing", targetSpeed, wantedThrottle).
+				autostage().
+				wait CONTROL_INTERVAL.
+			}
+		}
+
+		local impactVelocityMagnitude is ship:velocity:surface:mag.
+		local resultStatus is
+			choose status
+			if impactVelocityMagnitude <= impactSpeedLimit
+			else "CRASHED".
+
+		set wantedThrottle to 0.
+
+		displayDescent(resultStatus, 0, wantedThrottle).
+		dmsg("Descent: " + resultStatus + "; contact speed=" + round(impactVelocityMagnitude, 1) + "m/s").
+
+		// Hold upright while the landing gear settles.
+		lock steering to up.
+		wait 2.
+
 		unlock throttle.
 		unlock steering.
+		wait 0.
+		sas on.
 
-		return status.
+		return resultStatus.
 	}
 
 	export(descent@).
