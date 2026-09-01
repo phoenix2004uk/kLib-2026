@@ -3,20 +3,27 @@
 	local autostage is import("staging-v1"):autostage.
 	local awaitSteering is import("steering-v1"):awaitSteering.
 
-	local CONTROL_INTERVAL is 0.1.
-	local VERTICAL_RESPONSE_TIME is 1.
+	// Vertical-speed correction time; lower reacts harder/faster.
+	local VERTICAL_RESPONSE_TIME is 0.75.
+	// Vertical-speed error allowed before steering recovery.
 	local VERTICAL_SPEED_TOLERANCE is 0.5.
+	// Ground-speed error allowed before steering/throttle correction.
 	local GROUND_SPEED_TOLERANCE is 0.5.
-	local HORIZONTAL_THROTTLE_STEP is 0.01.
-	local HORIZONTAL_SPEED_THRESHOLD is 0.5.
-	local GEAR_DEPLOYMENT_ALTITUDE is 1000.
-	local CRASHED_IMPACT_SPEED is 10.
-	local STEERING_STEP is 0.05.
-	local STEERING_RECOVERY is 0.5.
-	local STEERING_RETURN is 0.9.
-
+	// Horizontal throttle change per second; higher reacts faster.
+	local HORIZONTAL_THROTTLE_RATE is 0.2.
+	// Initial horizontal steering bias when braking starts.
+	local STEERING_INITIAL_BIAS is 0.05.
+	// Bias doubling time; lower tilts horizontal faster.
+	local STEERING_GROWTH_TIME is 0.75.
+	// Bias halving time when vertical control is saturated.
+	local STEERING_RECOVERY_TIME is 0.25.
+	// Bias halving time once horizontal speed is under target.
+	local STEERING_RETURN_TIME is 0.75.
+	// Default vertical-speed target above the profile.
 	local HIGH_DESCENT_SPEED is -60.
+	// Default ground-speed target above the profile.
 	local HIGH_GROUND_SPEED is 250.
+	// Radar altitude, vertical-speed target, ground-speed target.
 	local DESCENT_PROFILE is list(
 		list(5000, -50, 200),
 		list(2000, -40, 125),
@@ -27,6 +34,13 @@
 		list(50, -8, 1),
 		list(20, -5, 0)
 	).
+
+	// Ground speed considered negligible.
+	local HORIZONTAL_SPEED_THRESHOLD is 0.5.
+	// Radar altitude to deploy landing gear.
+	local GEAR_DEPLOYMENT_ALTITUDE is 1000.
+	// Contact speed above which landing is considered crashed.
+	local CRASHED_IMPACT_SPEED is 10.
 
 	local function descentVector {
 		parameter horizontalBias.
@@ -82,15 +96,15 @@
 	}
 
 	local function adjustHorizontalThrottle {
-		parameter horizontalThrottle, targetGroundSpeed.
+		parameter horizontalThrottle, targetGroundSpeed, deltaTime.
 
 		if groundSpeed > targetGroundSpeed + GROUND_SPEED_TOLERANCE {
 			return min(
 				horizontalThrottleLimit(),
-				horizontalThrottle + HORIZONTAL_THROTTLE_STEP
+				horizontalThrottle + HORIZONTAL_THROTTLE_RATE * deltaTime
 			).
 		}
-		return max(0, horizontalThrottle - HORIZONTAL_THROTTLE_STEP).
+		return max(0, horizontalThrottle - HORIZONTAL_THROTTLE_RATE * deltaTime).
 	}
 
 	local function surfaceContact {
@@ -172,7 +186,7 @@
 				horizontalBias
 			).
 			autostage().
-			wait CONTROL_INTERVAL.
+			wait 0.
 		}
 
 		if not surfaceContact() {
@@ -185,12 +199,19 @@
 			set targetGroundSpeed to targetSpeeds[1].
 			local lastTargetSpeed is targetSpeed.
 			local lastTargetGroundSpeed is targetGroundSpeed.
+			local lastControlTime is time:seconds.
+			local controlTime is lastControlTime.
+			local deltaTime is 0.
 			logDescent("guided descent", targetSpeed, targetGroundSpeed, horizontalBias).
 
 			until (
 				alt:radar <= finalDescentAltitude and
 				groundSpeed <= HORIZONTAL_SPEED_THRESHOLD
 			) or surfaceContact() {
+				set controlTime to time:seconds.
+				set deltaTime to controlTime - lastControlTime.
+				set lastControlTime to controlTime.
+
 				// Once a profile target tightens, do not relax it if
 				// radar altitude subsequently increases.
 				set targetSpeeds to speedsAtAltitude().
@@ -208,24 +229,31 @@
 				}
 
 				local verticalThrottle is descentThrottle(targetSpeed).
+				local verticalThrustFraction is vdot(ship:facing:foreVector, up:vector).
 
-				// Keep prioritising excessive horizontal speed. Only pull
-				// upright if full throttle cannot maintain vertical speed.
-				if verticalSpeed < targetSpeed - VERTICAL_SPEED_TOLERANCE and verticalThrottle >= 1 {
-					set horizontalBias to horizontalBias * STEERING_RECOVERY.
+				// Horizontal error controls attitude. Vertical error is first
+				// handled with throttle; pull upright only when vertical control
+				// is saturated, or if actual steering has crossed the horizon.
+				if (verticalSpeed < targetSpeed - VERTICAL_SPEED_TOLERANCE and verticalThrottle >= 1)
+					or verticalThrustFraction <= 0 {
+					set horizontalBias to horizontalBias * 0.5^(deltaTime / STEERING_RECOVERY_TIME).
 				}
 				else if groundSpeed > targetGroundSpeed + GROUND_SPEED_TOLERANCE {
 					set horizontalBias to max(
-						STEERING_STEP,
-						horizontalBias * (1 + STEERING_STEP)
+						STEERING_INITIAL_BIAS,
+						horizontalBias * 2^(deltaTime / STEERING_GROWTH_TIME)
 					).
 				}
 				else if groundSpeed < targetGroundSpeed - GROUND_SPEED_TOLERANCE {
-					set horizontalBias to horizontalBias * STEERING_RETURN.
+					set horizontalBias to horizontalBias * 0.5^(deltaTime / STEERING_RETURN_TIME).
 				}
 
 				set steeringVector to descentVector(horizontalBias).
-				set horizontalThrottle to adjustHorizontalThrottle(horizontalThrottle, targetGroundSpeed).
+				set horizontalThrottle to adjustHorizontalThrottle(
+					horizontalThrottle,
+					targetGroundSpeed,
+					deltaTime
+				).
 				set wantedThrottle to max(verticalThrottle, horizontalThrottle).
 
 				displayDescent(
@@ -236,7 +264,7 @@
 					horizontalBias
 				).
 				autostage().
-				wait CONTROL_INTERVAL.
+				wait 0.
 			}
 		}
 
@@ -268,7 +296,7 @@
 					horizontalBias
 				).
 				autostage().
-				wait CONTROL_INTERVAL.
+				wait 0.
 			}
 		}
 
@@ -284,15 +312,17 @@
 		dmsg("Descent: " + resultStatus + "; contact speed=" + round(impactVelocityMagnitude, 1) + "m/s").
 
 		// Hold upright while the landing gear settles.
+		dmsg("SAS at contact: " + sas).
+		sas off.
 		lock steering to up.
 		wait 2.
 
+		dmsg("SAS before steering unlock: " + sas).
 		unlock throttle.
 		unlock steering.
-		dmsg("Steering target: " + steeringManager:TARGET).
+		dmsg("Steering target: " + steeringManager:target).
 		dmsg("Steering enabled immediately after unlock: " + steeringManager:enabled).
 		wait until not steeringManager:enabled.
-		dmsg("Steering target: " + steeringManager:TARGET).
 		dmsg("Steering manager released; enabling SAS").
 		sas on.
 
