@@ -5,7 +5,7 @@
 
 	// PID tuning: Kp, Ki, Kd, epsilon.
 	local VERTICAL_PID is list(0.75, 0, 0.1, 0.25).
-	local HORIZONTAL_PID is list(0.3, 0, 0.1, 0.25).
+	local HORIZONTAL_PID is list(0.5, 0, 0.05, 0.25).
 
 	// Radar altitude, vertical speed, maximum horizontal speed.
 	// Targets are linearly interpolated between profile rows.
@@ -114,9 +114,7 @@
 
 		if thrustAccelerationVector:mag <= 0 {
 			return list(
-				choose up:vector
-				if groundSpeed <= HORIZONTAL_PID[3]
-				else fallbackVector,
+				up:vector,
 				0,
 				verticalThrustAcceleration,
 				horizontalThrustAcceleration
@@ -250,6 +248,7 @@
 
 		if not surfaceContact() {
 			set wantedThrottle to 0.
+			set steeringVector to up:vector.
 			lock steering to steeringVector.
 
 			local verticalPid is pidLoop(
@@ -280,6 +279,40 @@
 				targetGroundSpeed,
 				wantedThrottle,
 				steeringVector
+			).
+
+			// DEBUG
+			local altitudeLog is min(
+				5000,
+				floor(alt:radar / 100) * 100
+			).
+			when alt:radar < altitudeLog then {
+				logDescent(
+					"altitude " + altitudeLog,
+					targetVerticalSpeed,
+					targetGroundSpeed,
+					wantedThrottle,
+					steeringVector
+				).
+				if altitudeLog > 0 {
+					set altitudeLog to altitudeLog - 100.
+					preserve.
+				}
+			}
+			local verticalSpeedDraw is vecdraw(
+				v(0,0,0), v(0,0,0), rgb(0,1,1), "V speed", 1, true
+			).
+			local horizontalSpeedDraw is vecdraw(
+				v(0,0,0), v(0,0,0), rgb(1,1,0), "H speed", 1, true
+			).
+			local verticalAccelerationDraw is vecdraw(
+				v(0,0,0), v(0,0,0), rgb(0,1,0), "V thrust", 1, true
+			).
+			local horizontalAccelerationDraw is vecdraw(
+				v(0,0,0), v(0,0,0), rgb(1,0,0), "H thrust", 1, true
+			).
+			local thrustAccelerationDraw is vecdraw(
+				v(0,0,0), v(0,0,0), rgb(1,1,1), "Thrust", 1, true
 			).
 
 			until surfaceContact() {
@@ -323,6 +356,26 @@
 				set verticalThrustAcceleration to descentCommand[2].
 				set horizontalThrustAcceleration to descentCommand[3].
 
+				{
+					// DEBUG Vectors
+					local horizontalVelocity is vxcl(up:vector, ship:velocity:surface).
+					local verticalAccelerationVector is up:vector * verticalThrustAcceleration.
+					local horizontalAccelerationVector is v(0,0,0).
+
+					if horizontalVelocity:mag > 0 {
+						set horizontalAccelerationVector to -horizontalVelocity:normalized * horizontalThrustAcceleration.
+					}
+
+					local thrustAccelerationVector is verticalAccelerationVector + horizontalAccelerationVector.
+
+					// Speeds scaled by 0.2; accelerations by 10 for visibility.
+					set verticalSpeedDraw:vec to up:vector * verticalSpeed * 0.2.
+					set horizontalSpeedDraw:vec to horizontalVelocity * 0.2.
+					set verticalAccelerationDraw:vec to verticalAccelerationVector * 10.
+					set horizontalAccelerationDraw:vec to horizontalAccelerationVector * 10.
+					set thrustAccelerationDraw:vec to thrustAccelerationVector * 10.
+				}
+
 				displayDescent(
 					"Guided descent",
 					targetVerticalSpeed,
@@ -344,6 +397,11 @@
 
 		set wantedThrottle to 0.
 
+		{
+			// DEBUG
+			clearVecDraws().
+		}
+
 		displayDescent(resultStatus, 0, 0, wantedThrottle).
 		dmsg(
 			"Descent: " + resultStatus +
@@ -352,6 +410,13 @@
 		).
 
 		// Hold upright while the landing gear settles.
+// lock steering to up.
+// wait 2.
+
+// unlock throttle.
+// lock steering to "kill".
+
+// return resultStatus.
 		dmsg("SAS at contact: " + sas).
 		sas off.
 		lock steering to up.
