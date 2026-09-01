@@ -14,30 +14,18 @@
 	local STEERING_STEP is 0.05.
 	local STEERING_RECOVERY is 0.5.
 	local STEERING_RETURN is 0.9.
-	local REFERENCE_GRAVITY is 1.63.
 
 	local HIGH_DESCENT_SPEED is -60.
-	local DESCENT_STEPS is list(
-		list(5000, -50),
-		list(2000, -40),
-		list(1000, -30),
-		list(500, -20),
-		list(200, -15),
-		list(100, -10),
-		list(50, -8),
-		list(20, -5)
-	).
-
 	local HIGH_GROUND_SPEED is 250.
-	local GROUND_SPEED_STEPS is list(
-		list(5000, 200),
-		list(2000, 150),
-		list(1000, 75),
-		list(500, 25),
-		list(200, 10),
-		list(100, 5),
-		list(50, 2),
-		list(20, 0)
+	local DESCENT_PROFILE is list(
+		list(5000, -50, 200),
+		list(2000, -40, 125),
+		list(1000, -30, 50),
+		list(500, -20, 10),
+		list(200, -15, 5),
+		list(100, -10, 2),
+		list(50, -8, 1),
+		list(20, -5, 0)
 	).
 
 	local function descentVector {
@@ -48,16 +36,16 @@
 		return (up:vector - horizontalVelocity:normalized * horizontalBias):normalized.
 	}
 
-	local function speedAtAltitude {
-		parameter profileAltitude, highSpeed, speedSteps.
-
-		local targetSpeed is highSpeed.
-		for speedStep in speedSteps {
-			if profileAltitude <= speedStep[0] {
-				set targetSpeed to speedStep[1].
+	local function speedsAtAltitude {
+		local targetSpeed is HIGH_DESCENT_SPEED.
+		local targetGroundSpeed is HIGH_GROUND_SPEED.
+		for descentStep in DESCENT_PROFILE {
+			if alt:radar <= descentStep[0] {
+				set targetSpeed to descentStep[1].
+				set targetGroundSpeed to descentStep[2].
 			}
 		}
-		return targetSpeed.
+		return list(targetSpeed, targetGroundSpeed).
 	}
 
 	local function descentThrottle {
@@ -96,8 +84,6 @@
 	local function adjustHorizontalThrottle {
 		parameter horizontalThrottle, targetGroundSpeed.
 
-		if verticalSpeed >= 0 return 0.
-
 		if groundSpeed > targetGroundSpeed + GROUND_SPEED_TOLERANCE {
 			return min(
 				horizontalThrottleLimit(),
@@ -112,11 +98,11 @@
 	}
 
 	local function displayDescent {
-		parameter phase, profileAltitude, targetSpeed, wantedThrottle,
+		parameter phase, targetSpeed, wantedThrottle,
 			targetGroundSpeed is 0, horizontalBias is 0.
 
 		printLn("Descent:        " + phase, 0).
-		printLn("Radar/profile:  " + round(alt:radar, 1) + " / " + round(profileAltitude, 1) + " m", 1).
+		printLn("Radar:          " + round(alt:radar, 1) + " m", 1).
 		printLn("Periapsis:      " + round(obt:periapsis, 1) + " m", 2).
 		printLn("Vertical speed: " + round(verticalSpeed, 1) + " m/s", 3).
 		printLn("Target speed:   " + round(targetSpeed, 1) + " m/s", 4).
@@ -127,12 +113,11 @@
 	}
 
 	local function logDescent {
-		parameter phase, profileAltitude, targetSpeed, targetGroundSpeed, horizontalBias.
+		parameter phase, targetSpeed, targetGroundSpeed, horizontalBias.
 
 		dmsg(
 			"Descent: " + phase +
 				"; radar=" + round(alt:radar, 1) +
-				"m; profile=" + round(profileAltitude, 1) +
 				"m; vertical=" + round(verticalSpeed, 1) +
 				"/" + round(targetSpeed, 1) +
 				"m/s; ground=" + round(groundSpeed, 1) +
@@ -147,8 +132,6 @@
 			landingAltitude is 20,
 			landingSpeed is 4.
 
-		local gravityScale is sqrt((body:mu / body:radius^2) / REFERENCE_GRAVITY).
-		local profileAltitude is alt:radar / gravityScale.
 		local wantedThrottle is 0.
 		local horizontalThrottle is 0.
 		local horizontalBias is 0.
@@ -160,13 +143,12 @@
 		clearScreen.
 		displayDescent(
 			"Coast to periapsis",
-			profileAltitude,
 			targetSpeed,
 			wantedThrottle,
 			targetGroundSpeed,
 			horizontalBias
 		).
-		logDescent("coasting to periapsis", profileAltitude, targetSpeed, targetGroundSpeed, horizontalBias).
+		logDescent("coasting to periapsis", targetSpeed, targetGroundSpeed, horizontalBias).
 
 		if eta:periapsis > 30 {
 			warpTo(time:seconds + eta:periapsis - 30).
@@ -179,14 +161,11 @@
 
 		// Cancel most, but not all, horizontal velocity.
 		set wantedThrottle to 1.
-		set profileAltitude to alt:radar / gravityScale.
-		logDescent("deorbit burn", profileAltitude, targetSpeed, deorbitGroundSpeed, horizontalBias).
+		logDescent("deorbit burn", targetSpeed, deorbitGroundSpeed, horizontalBias).
 
 		until (groundSpeed <= deorbitGroundSpeed and obt:periapsis < 0) or surfaceContact() {
-			set profileAltitude to alt:radar / gravityScale.
 			displayDescent(
 				"Deorbit burn",
-				profileAltitude,
 				targetSpeed,
 				wantedThrottle,
 				deorbitGroundSpeed,
@@ -197,27 +176,29 @@
 		}
 
 		if not surfaceContact() {
-			// Follow the gravity-scaled vertical and horizontal speed profiles.
+			// Follow the vertical and horizontal speed profile.
 			set wantedThrottle to 0.
 			lock steering to steeringVector.
 
-			set profileAltitude to alt:radar / gravityScale.
-			set targetSpeed to speedAtAltitude(profileAltitude, HIGH_DESCENT_SPEED, DESCENT_STEPS).
-			set targetGroundSpeed to speedAtAltitude(profileAltitude, HIGH_GROUND_SPEED, GROUND_SPEED_STEPS).
+			local targetSpeeds is speedsAtAltitude().
+			set targetSpeed to targetSpeeds[0].
+			set targetGroundSpeed to targetSpeeds[1].
 			local lastTargetSpeed is targetSpeed.
 			local lastTargetGroundSpeed is targetGroundSpeed.
-			logDescent("guided descent", profileAltitude, targetSpeed, targetGroundSpeed, horizontalBias).
+			logDescent("guided descent", targetSpeed, targetGroundSpeed, horizontalBias).
 
 			until (
-				profileAltitude <= finalDescentAltitude and
+				alt:radar <= finalDescentAltitude and
 				groundSpeed <= HORIZONTAL_SPEED_THRESHOLD
 			) or surfaceContact() {
-				set profileAltitude to alt:radar / gravityScale.
-				set targetSpeed to speedAtAltitude(profileAltitude, HIGH_DESCENT_SPEED, DESCENT_STEPS).
-				set targetGroundSpeed to speedAtAltitude(profileAltitude, HIGH_GROUND_SPEED, GROUND_SPEED_STEPS).
+				// Once a profile target tightens, do not relax it if
+				// radar altitude subsequently increases.
+				set targetSpeeds to speedsAtAltitude().
+				set targetSpeed to max(targetSpeed, targetSpeeds[0]).
+				set targetGroundSpeed to min(targetGroundSpeed, targetSpeeds[1]).
 
 				if targetSpeed <> lastTargetSpeed or targetGroundSpeed <> lastTargetGroundSpeed {
-					logDescent("profile step", profileAltitude, targetSpeed, targetGroundSpeed, horizontalBias).
+					logDescent("profile step", targetSpeed, targetGroundSpeed, horizontalBias).
 					set lastTargetSpeed to targetSpeed.
 					set lastTargetGroundSpeed to targetGroundSpeed.
 				}
@@ -226,14 +207,18 @@
 					gear on.
 				}
 
-				if verticalSpeed >= 0 {
-					set horizontalBias to 0.
-				}
-				else if verticalSpeed < targetSpeed - VERTICAL_SPEED_TOLERANCE {
+				local verticalThrottle is descentThrottle(targetSpeed).
+
+				// Keep prioritising excessive horizontal speed. Only pull
+				// upright if full throttle cannot maintain vertical speed.
+				if verticalSpeed < targetSpeed - VERTICAL_SPEED_TOLERANCE and verticalThrottle >= 1 {
 					set horizontalBias to horizontalBias * STEERING_RECOVERY.
 				}
 				else if groundSpeed > targetGroundSpeed + GROUND_SPEED_TOLERANCE {
-					set horizontalBias to horizontalBias + STEERING_STEP.
+					set horizontalBias to max(
+						STEERING_STEP,
+						horizontalBias * (1 + STEERING_STEP)
+					).
 				}
 				else if groundSpeed < targetGroundSpeed - GROUND_SPEED_TOLERANCE {
 					set horizontalBias to horizontalBias * STEERING_RETURN.
@@ -241,11 +226,10 @@
 
 				set steeringVector to descentVector(horizontalBias).
 				set horizontalThrottle to adjustHorizontalThrottle(horizontalThrottle, targetGroundSpeed).
-				set wantedThrottle to max(descentThrottle(targetSpeed), horizontalThrottle).
+				set wantedThrottle to max(verticalThrottle, horizontalThrottle).
 
 				displayDescent(
 					"Guided descent",
-					profileAltitude,
 					targetSpeed,
 					wantedThrottle,
 					targetGroundSpeed,
@@ -257,17 +241,16 @@
 		}
 
 		if not surfaceContact() {
-			// Horizontal velocity is gone; descend upright.
+			// Horizontal velocity is negligible; descend upright.
 			set horizontalThrottle to 0.
 			set horizontalBias to 0.
 			lock steering to up.
-			set targetSpeed to speedAtAltitude(profileAltitude, HIGH_DESCENT_SPEED, DESCENT_STEPS).
-			logDescent("final descent", profileAltitude, targetSpeed, HORIZONTAL_SPEED_THRESHOLD, horizontalBias).
+			set targetSpeed to max(targetSpeed, speedsAtAltitude()[0]).
+			logDescent("final descent", targetSpeed, HORIZONTAL_SPEED_THRESHOLD, horizontalBias).
 
 			until surfaceContact() {
-				set profileAltitude to alt:radar / gravityScale.
-				set targetSpeed to speedAtAltitude(profileAltitude, HIGH_DESCENT_SPEED, DESCENT_STEPS).
-				if profileAltitude <= landingAltitude {
+				set targetSpeed to max(targetSpeed, speedsAtAltitude()[0]).
+				if alt:radar <= landingAltitude {
 					set targetSpeed to -abs(landingSpeed).
 				}
 
@@ -279,7 +262,6 @@
 
 				displayDescent(
 					"Final descent",
-					profileAltitude,
 					targetSpeed,
 					wantedThrottle,
 					HORIZONTAL_SPEED_THRESHOLD,
@@ -298,7 +280,7 @@
 
 		set wantedThrottle to 0.
 
-		displayDescent(resultStatus, profileAltitude, 0, wantedThrottle).
+		displayDescent(resultStatus, 0, wantedThrottle).
 		dmsg("Descent: " + resultStatus + "; contact speed=" + round(impactVelocityMagnitude, 1) + "m/s").
 
 		// Hold upright while the landing gear settles.
@@ -307,7 +289,11 @@
 
 		unlock throttle.
 		unlock steering.
-		wait 0.
+		dmsg("Steering target: " + steeringManager:TARGET).
+		dmsg("Steering enabled immediately after unlock: " + steeringManager:enabled).
+		wait until not steeringManager:enabled.
+		dmsg("Steering target: " + steeringManager:TARGET).
+		dmsg("Steering manager released; enabling SAS").
 		sas on.
 
 		return resultStatus.
