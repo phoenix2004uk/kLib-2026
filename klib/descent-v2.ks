@@ -5,7 +5,7 @@
 
 	// PID tuning: Kp, Ki, Kd, epsilon.
 	local VERTICAL_PID is list(0.75, 0, 0.1, 0.25).
-	local HORIZONTAL_PID is list(0.5, 0, 0.05, 0.25).
+	local HORIZONTAL_PID is list(0.75, 0.03, 0.05, 0.5).
 
 	// Radar altitude, vertical speed, maximum horizontal speed.
 	// Targets are linearly interpolated between profile rows.
@@ -17,18 +17,19 @@
 		list(500, -20, 10),
 		list(200, -15, 5),
 		list(100, -10, 2),
-		list(50, -8, 1),
-		list(20, -5, 0),
-		list(0, -4, 0)
+		list(50, -8, 0),
+		list(25, -4, 0),
+		list(0, -2, 0)
 	).
 
 	local GEAR_DEPLOYMENT_ALTITUDE is 1000.
 	local CRASHED_IMPACT_SPEED is 10.
 
 	local function descentTargets {
-		local radarAltitude is alt:radar.
+		parameter bottomAltRadar.
+
 		local firstStep is DESCENT_PROFILE[0].
-		if radarAltitude >= firstStep[0] {
+		if bottomAltRadar >= firstStep[0] {
 			return list(firstStep[1], firstStep[2], 0).
 		}
 
@@ -38,8 +39,8 @@
 		do {
 			local upperStep is DESCENT_PROFILE[profileIndex - 1].
 			local lowerStep is DESCENT_PROFILE[profileIndex].
-			if radarAltitude >= lowerStep[0] {
-				local fraction is (radarAltitude - lowerStep[0]) / (upperStep[0] - lowerStep[0]).
+			if bottomAltRadar >= lowerStep[0] {
+				local fraction is (bottomAltRadar - lowerStep[0]) / (upperStep[0] - lowerStep[0]).
 				return list(
 					lowerStep[1] + (upperStep[1] - lowerStep[1]) * fraction,
 					lowerStep[2] + (upperStep[2] - lowerStep[2]) * fraction,
@@ -60,7 +61,7 @@
 	// Vertical control has priority over horizontal braking.
 	local function descentControl {
 		parameter verticalPid, horizontalPid,
-			targetVerticalSpeed, targetGroundSpeed, fallbackVector.
+			targetVerticalSpeed, maxGroundSpeed, fallbackVector.
 
 		if ship:availableThrust <= 0 {
 			return list(fallbackVector, 0, 0, 0).
@@ -80,10 +81,18 @@
 		// Give horizontal braking whatever acceleration remains after
 		// satisfying the requested vertical thrust component.
 		local maxHorizontalAcceleration is sqrt(max(0, maxThrustAcceleration^2 - verticalThrustAcceleration^2)).
-		set horizontalPid:setpoint to targetGroundSpeed.
+		set horizontalPid:setpoint to maxGroundSpeed.
 		set horizontalPid:minOutput to -maxHorizontalAcceleration.
 		set horizontalPid:maxOutput to 0.
-		local horizontalThrustAcceleration is -horizontalPid:update(controlTime, groundSpeed).
+
+		local horizontalThrustAcceleration is 0.
+		if groundSpeed <= horizontalPid:epsilon {
+			set horizontalPid:ki to 0.
+			horizontalPid:reset().
+		}
+		else {
+			set horizontalThrustAcceleration to -horizontalPid:update(controlTime, groundSpeed).
+		}
 
 		// Horizontal thrust may brake but never accelerate the vessel
 		// sideways to chase a target after an overshoot.
@@ -137,12 +146,12 @@
 	}
 
 	local function displayDescent {
-		parameter phase, targetVerticalSpeed, targetGroundSpeed,
+		parameter phase, bottomAltRadar, targetVerticalSpeed, maxGroundSpeed,
 			wantedThrottle, verticalThrustAcceleration is 0,
 			horizontalThrustAcceleration is 0.
 
 		printLn("Descent:        " + phase, 0).
-		printLn("Radar:          " + round(alt:radar, 1) + " m", 1).
+		printLn("Radar/Bottom:   " + round(alt:radar, 1) + " m / " + round(bottomAltRadar, 1) + " m", 1).
 		printLn("Periapsis:      " + round(obt:periapsis, 1) + " m", 2).
 		printLn(
 			"Vertical speed: " + round(verticalSpeed, 1) +
@@ -151,7 +160,7 @@
 		).
 		printLn(
 			"Ground speed:   " + round(groundSpeed, 1) +
-			" / " + round(targetGroundSpeed, 1) + " m/s",
+			" / " + round(maxGroundSpeed, 1) + " m/s",
 			4
 		).
 		printLn(
@@ -174,16 +183,17 @@
 	}
 
 	local function logDescent {
-		parameter phase, targetVerticalSpeed, targetGroundSpeed,
+		parameter phase, bottomAltRadar, targetVerticalSpeed, maxGroundSpeed,
 			wantedThrottle, steeringVector.
 
 		dmsg(
 			"Descent: " + phase +
 				"; radar=" + round(alt:radar, 1) +
+				"m; bottom=" + round(bottomAltRadar, 1) +
 				"m; vertical=" + round(verticalSpeed, 1) +
 				"/" + round(targetVerticalSpeed, 1) +
 				"m/s; ground=" + round(groundSpeed, 1) +
-				"/" + round(targetGroundSpeed, 1) +
+				"/" + round(maxGroundSpeed, 1) +
 				"m/s; throttle=" +
 				round(wantedThrottle * 100, 0) +
 				"%; zenith=" +
@@ -194,23 +204,29 @@
 	function descent {
 		local wantedThrottle is 0.
 		local targetVerticalSpeed is 0.
-		local targetGroundSpeed is DESCENT_PROFILE[0][2].
+		local maxGroundSpeed is DESCENT_PROFILE[0][2].
 		local steeringVector is up:vector.
 		local verticalThrustAcceleration is 0.
 		local horizontalThrustAcceleration is 0.
 		lock throttle to wantedThrottle.
 
+		local vesselBounds is ship:bounds.
+		local boundedByLandingLegs is false.
+		local lock bottomAltRadar to vesselBounds:bottomAltRadar.
+
 		clearScreen.
 		displayDescent(
 			"Coast to periapsis",
+			bottomAltRadar,
 			targetVerticalSpeed,
-			targetGroundSpeed,
+			maxGroundSpeed,
 			wantedThrottle
 		).
 		logDescent(
 			"coasting to periapsis",
+			bottomAltRadar,
 			targetVerticalSpeed,
-			targetGroundSpeed,
+			maxGroundSpeed,
 			wantedThrottle,
 			steeringVector
 		).
@@ -229,8 +245,9 @@
 		set wantedThrottle to 1.
 		logDescent(
 			"deorbit burn",
+			bottomAltRadar,
 			targetVerticalSpeed,
-			targetGroundSpeed,
+			maxGroundSpeed,
 			wantedThrottle,
 			srfRetrograde:vector
 		).
@@ -238,18 +255,24 @@
 		until (groundSpeed <= DESCENT_PROFILE[0][2] and obt:periapsis < 0) or surfaceContact() {
 			displayDescent(
 				"Deorbit burn",
+				bottomAltRadar,
 				targetVerticalSpeed,
 				DESCENT_PROFILE[0][2],
 				wantedThrottle
 			).
-			autostage().
+
+			if autostage() set vesselBounds to ship:bounds.
+
 			wait 0.
 		}
 
 		if not surfaceContact() {
 			set wantedThrottle to 0.
 			set steeringVector to up:vector.
-			lock steering to steeringVector.
+			lock steering to
+				choose lookDirUp(steeringVector, sun:position)
+				if maxGroundSpeed <= 0
+				else steeringVector.
 
 			local verticalPid is pidLoop(
 				VERTICAL_PID[0],
@@ -268,55 +291,22 @@
 				HORIZONTAL_PID[3]
 			).
 
-			local targetProfile is descentTargets().
+			local targetProfile is descentTargets(bottomAltRadar).
 			set targetVerticalSpeed to targetProfile[0].
-			set targetGroundSpeed to targetProfile[1].
+			set maxGroundSpeed to targetProfile[1].
 			local currentProfileSegment is targetProfile[2].
 
 			logDescent(
 				"guided descent",
+				bottomAltRadar,
 				targetVerticalSpeed,
-				targetGroundSpeed,
+				maxGroundSpeed,
 				wantedThrottle,
 				steeringVector
 			).
 
-			// DEBUG
-			local altitudeLog is min(
-				5000,
-				floor(alt:radar / 100) * 100
-			).
-			when alt:radar < altitudeLog then {
-				logDescent(
-					"altitude " + altitudeLog,
-					targetVerticalSpeed,
-					targetGroundSpeed,
-					wantedThrottle,
-					steeringVector
-				).
-				if altitudeLog > 0 {
-					set altitudeLog to altitudeLog - 100.
-					preserve.
-				}
-			}
-			local verticalSpeedDraw is vecdraw(
-				v(0,0,0), v(0,0,0), rgb(0,1,1), "V speed", 1, true
-			).
-			local horizontalSpeedDraw is vecdraw(
-				v(0,0,0), v(0,0,0), rgb(1,1,0), "H speed", 1, true
-			).
-			local verticalAccelerationDraw is vecdraw(
-				v(0,0,0), v(0,0,0), rgb(0,1,0), "V thrust", 1, true
-			).
-			local horizontalAccelerationDraw is vecdraw(
-				v(0,0,0), v(0,0,0), rgb(1,0,0), "H thrust", 1, true
-			).
-			local thrustAccelerationDraw is vecdraw(
-				v(0,0,0), v(0,0,0), rgb(1,1,1), "Thrust", 1, true
-			).
-
 			until surfaceContact() {
-				set targetProfile to descentTargets().
+				set targetProfile to descentTargets(bottomAltRadar).
 
 				// Once the descent profile progresses, never relax it if
 				// radar altitude subsequently increases.
@@ -324,8 +314,8 @@
 					targetVerticalSpeed,
 					targetProfile[0]
 				).
-				set targetGroundSpeed to min(
-					targetGroundSpeed,
+				set maxGroundSpeed to min(
+					maxGroundSpeed,
 					targetProfile[1]
 				).
 
@@ -333,14 +323,21 @@
 					set currentProfileSegment to targetProfile[2].
 					logDescent(
 						"profile segment",
+						bottomAltRadar,
 						targetVerticalSpeed,
-						targetGroundSpeed,
+						maxGroundSpeed,
 						wantedThrottle,
 						steeringVector
 					).
 				}
 
-				if alt:radar <= GEAR_DEPLOYMENT_ALTITUDE {
+				// re-calculate bounds once the landing legs are fully deployed
+				if not boundedByLandingLegs and legs {
+					set boundedByLandingLegs to true.
+					set vesselBounds to ship:bounds.
+				}
+
+				if not gear and bottomAltRadar <= GEAR_DEPLOYMENT_ALTITUDE {
 					gear on.
 				}
 
@@ -348,7 +345,7 @@
 					verticalPid,
 					horizontalPid,
 					targetVerticalSpeed,
-					targetGroundSpeed,
+					maxGroundSpeed,
 					steeringVector
 				).
 				set steeringVector to descentCommand[0].
@@ -356,35 +353,18 @@
 				set verticalThrustAcceleration to descentCommand[2].
 				set horizontalThrustAcceleration to descentCommand[3].
 
-				{
-					// DEBUG Vectors
-					local horizontalVelocity is vxcl(up:vector, ship:velocity:surface).
-					local verticalAccelerationVector is up:vector * verticalThrustAcceleration.
-					local horizontalAccelerationVector is v(0,0,0).
-
-					if horizontalVelocity:mag > 0 {
-						set horizontalAccelerationVector to -horizontalVelocity:normalized * horizontalThrustAcceleration.
-					}
-
-					local thrustAccelerationVector is verticalAccelerationVector + horizontalAccelerationVector.
-
-					// Speeds scaled by 0.2; accelerations by 10 for visibility.
-					set verticalSpeedDraw:vec to up:vector * verticalSpeed * 0.2.
-					set horizontalSpeedDraw:vec to horizontalVelocity * 0.2.
-					set verticalAccelerationDraw:vec to verticalAccelerationVector * 10.
-					set horizontalAccelerationDraw:vec to horizontalAccelerationVector * 10.
-					set thrustAccelerationDraw:vec to thrustAccelerationVector * 10.
-				}
-
 				displayDescent(
 					"Guided descent",
+					bottomAltRadar,
 					targetVerticalSpeed,
-					targetGroundSpeed,
+					maxGroundSpeed,
 					wantedThrottle,
 					verticalThrustAcceleration,
 					horizontalThrustAcceleration
 				).
-				autostage().
+
+				if autostage() set vesselBounds to ship:bounds.
+
 				wait 0.
 			}
 		}
@@ -397,12 +377,7 @@
 
 		set wantedThrottle to 0.
 
-		{
-			// DEBUG
-			clearVecDraws().
-		}
-
-		displayDescent(resultStatus, 0, 0, wantedThrottle).
+		displayDescent(resultStatus, bottomAltRadar, 0, 0, wantedThrottle).
 		dmsg(
 			"Descent: " + resultStatus +
 			"; contact speed=" +
@@ -410,25 +385,12 @@
 		).
 
 		// Hold upright while the landing gear settles.
-// lock steering to up.
-// wait 2.
+		lock steering to lookDirUp(up:vector, sun:position).
+		wait 10.
 
-// unlock throttle.
-// lock steering to "kill".
-
-// return resultStatus.
-		dmsg("SAS at contact: " + sas).
-		sas off.
-		lock steering to up.
-		wait 2.
-
-		dmsg("SAS before steering unlock: " + sas).
 		unlock throttle.
 		unlock steering.
-		dmsg("Steering target: " + steeringManager:target).
-		dmsg("Steering enabled immediately after unlock: " + steeringManager:enabled).
 		wait until not steeringManager:enabled.
-		dmsg("Steering manager released; enabling SAS").
 		sas on.
 
 		return resultStatus.

@@ -66,7 +66,7 @@
 		printLn("Coasting to space").
 		lock throttle to 0.
 		wait 0.1.
-		wait until altitude > 70e3.
+		wait until altitude > body:atm:height.
 	}
 
 	function orbitalInsertion {

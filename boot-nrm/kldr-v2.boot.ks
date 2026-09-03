@@ -44,7 +44,7 @@ clearScreen.
 		else if volume(1):freespace-_kMessage:length>500 log _kMessage to _kDmsgBufferFile.
 	}.
 	global ApiOK is{
-		parameter _kValue,_kMessage is"".
+		parameter _kValue is true,_kMessage is"".
 		return lex("ok",true,"val",_kValue,"msg",_kMessage).
 	}.
 	global ApiFail is{

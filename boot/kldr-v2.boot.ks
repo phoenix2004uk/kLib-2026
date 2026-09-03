@@ -66,7 +66,7 @@ clearScreen.
 	}.
 
 	global ApiOK is {
-		parameter _kValue, _kMessage is "".
+		parameter _kValue is true, _kMessage is "".
 
 		return lex(
 			"ok", true,
