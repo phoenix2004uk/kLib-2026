@@ -8,7 +8,10 @@ local airlessAscent is import("airlessAscent-v1").
 local circularize is import("mnv/circularizeAtAp-v1").
 local returnFromMoon is import("mnv/returnFromMoon-v1").
 local atmosphericDescent is import("atmosphericDescent-v1").
-local stageUntil is import("staging-v1"):stageUntil.
+local staging is import("staging-v1").
+local stageUntil is staging:stageUntil.
+local autostage is staging:autostage.
+local awaitSteering is import("steering-v1"):awaitSteering.
 clearScreen.
 
 // Mission Configuration
@@ -29,6 +32,7 @@ local returnPeriapsis is 35e3.
 	transferToMoon(targetBody).
 	awaitSOIChange(targetBody).
 	trimMoonFlyby(flybyPeriapsis).
+	moonDeorbitAtPeriapsis().
 	moonDescent().
 	{
 		local returnToOrbit is false.
@@ -148,6 +152,28 @@ local returnPeriapsis is 35e3.
 		dmsg("Trim maneuver complete", true).
 		dmsg("  target periapsis = " + round(altitudeSafetyResult:val + safeAltitudeMargin, 1), true).
 		dmsg("  error = " + round(obt:periapsis - (altitudeSafetyResult:val + safeAltitudeMargin), 1), true).
+	}
+
+	function moonDeorbitAtPeriapsis {
+		dmsg("Performing de-orbit burn", true).
+
+		if eta:periapsis > 15 {
+			local deorbitUT is time:seconds + eta:periapsis.
+			warpTo(deorbitUT - 15).
+			wait until time:seconds > deorbitUT - 15.
+			wait until kuniverse:timewarp:issettled.
+		}
+
+		lock steering to srfRetrograde.
+		awaitSteering().
+		wait until eta:periapsis <= 1.
+
+		lock throttle to 1.
+		until obt:periapsis < -10e3 and groundSpeed <= 250 {
+			autostage().
+			wait 0.
+		}
+		lock throttle to 0.
 	}
 
 	function moonDescent {

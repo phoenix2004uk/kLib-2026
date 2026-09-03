@@ -1,7 +1,6 @@
 {
 	local printLn is import("printLn-v1"):printLn.
 	local autostage is import("staging-v1"):autostage.
-	local awaitSteering is import("steering-v1"):awaitSteering.
 
 	// PID tuning: Kp, Ki, Kd, epsilon.
 	local VERTICAL_PID is list(0.75, 0, 0.1, 0.25).
@@ -215,56 +214,6 @@
 		local lock bottomAltRadar to vesselBounds:bottomAltRadar.
 
 		clearScreen.
-		displayDescent(
-			"Coast to periapsis",
-			bottomAltRadar,
-			targetVerticalSpeed,
-			maxGroundSpeed,
-			wantedThrottle
-		).
-		logDescent(
-			"coasting to periapsis",
-			bottomAltRadar,
-			targetVerticalSpeed,
-			maxGroundSpeed,
-			wantedThrottle,
-			steeringVector
-		).
-
-		if eta:periapsis > 30 {
-			warpTo(time:seconds + eta:periapsis - 30).
-		}
-
-		sas off.
-		lock steering to srfRetrograde.
-		awaitSteering().
-		wait until eta:periapsis <= 1.
-
-		// Lower periapsis below the surface while removing most
-		// horizontal velocity.
-		set wantedThrottle to 1.
-		logDescent(
-			"deorbit burn",
-			bottomAltRadar,
-			targetVerticalSpeed,
-			maxGroundSpeed,
-			wantedThrottle,
-			srfRetrograde:vector
-		).
-
-		until (groundSpeed <= DESCENT_PROFILE[0][2] and obt:periapsis < 0) or surfaceContact() {
-			displayDescent(
-				"Deorbit burn",
-				bottomAltRadar,
-				targetVerticalSpeed,
-				DESCENT_PROFILE[0][2],
-				wantedThrottle
-			).
-
-			if autostage() set vesselBounds to ship:bounds.
-
-			wait 0.
-		}
 
 		if not surfaceContact() {
 			set wantedThrottle to 0.
