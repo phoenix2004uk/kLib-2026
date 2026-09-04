@@ -1,4 +1,4 @@
-local rendezvous is import("mnv/rendezvous-v1").
+local rendezvous is import("prg/rendezvous-v1").
 local printOrbit is import("util/printOrbit-v1").
 clearScreen.
 
