@@ -1,8 +1,8 @@
 {
-	local OrbitalMechanics is import("orbitalMechanics-v1").
-	local OrbitalParameters is import("orbitalParameters-v1").
-	local solveLambert is import("mnv/solveLambert-v1").
-	local altitudeSafety is import("altitudeSafety-v1").
+	local OrbitalMechanics is import("mech/orbitalMechanics-v1").
+	local OrbitalParameters is import("mech/orbitalParameters-v1").
+	local solveLambert is import("mech/solveLambert-v2").
+	local altitudeSafety is import("tlm/altitudeSafety-v1").
 	local velocityChangeToNode is import("mnv/velocityChangeToNode-v1").
 	local createConfig is import("util/createConfig-v1").
 

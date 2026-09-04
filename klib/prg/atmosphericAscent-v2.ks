@@ -1,7 +1,7 @@
 {
-	local printLn is import("printLn-v1"):printLn.
-	local autostage is import("staging-v1"):autostage.
-	local awaitSteering is import("steering-v1"):awaitSteering.
+	local printLn is import("util/printLn-v1"):printLn.
+	local autostage is import("sys/staging-v1"):autostage.
+	local awaitSteering is import("sys/steering-v1"):awaitSteering.
 	
 	local ASCENT_VECTOR_BORDER is 35e3.
 	local ETA_PID_EPSILON is 1.

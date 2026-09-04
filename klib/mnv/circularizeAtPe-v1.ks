@@ -1,6 +1,6 @@
 {
-	local OrbitalMechanics is import("orbitalMechanics-v1").
-	local OrbitalParameters is import("orbitalParameters-v1").
+	local OrbitalMechanics is import("mech/orbitalMechanics-v1").
+	local OrbitalParameters is import("mech/orbitalParameters-v1").
 	function circularizeAtPe {
 		local burnTime is time:seconds + eta:periapsis.
 		local v0 is OrbitalMechanics:v(periapsis).

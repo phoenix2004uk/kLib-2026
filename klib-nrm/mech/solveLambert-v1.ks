@@ -1,5 +1,5 @@
 {
-	local math is import("math-v1").
+	local math is import("util/math-v1").
 
 	local MAXIMUM_LAMBERT_HOUSEHOLDER_ITERATIONS is 15,
 		MAXIMUM_LAMBERT_HALLEY_ITERATIONS is 13,

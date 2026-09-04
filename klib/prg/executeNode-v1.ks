@@ -1,6 +1,6 @@
 // #include "../kldr-stub.ks"
 {
-	local awaitSteering is import("steering-v1"):awaitSteering.
+	local awaitSteering is import("sys/steering-v1"):awaitSteering.
 
 	function isCurrentStageEngineActive {
 		parameter en, at_stage.

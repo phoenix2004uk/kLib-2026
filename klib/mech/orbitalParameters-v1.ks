@@ -1,5 +1,5 @@
 {
-	local math is import("math-v1").
+	local math is import("util/math-v1").
 
 	// works for elliptical orbits (e<1 -> a>0) and hyperbolic trajectories (e>1 -> a<0)
 	function SemiMajorAxis {

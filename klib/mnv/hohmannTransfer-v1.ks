@@ -1,8 +1,8 @@
 {
 	// Perform a Hohmann Transfer between 2 (almost) circular orbits
 
-	local OrbitalMechanics is import("orbitalMechanics-v1").
-	local OrbitalParameters is import("orbitalParameters-v1").
+	local OrbitalMechanics is import("mech/orbitalMechanics-v1").
+	local OrbitalParameters is import("mech/orbitalParameters-v1").
 
 	function getTransferTime {
 		parameter targetOrbitable.

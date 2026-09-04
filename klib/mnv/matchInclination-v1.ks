@@ -1,6 +1,6 @@
 {
-	local OrbitalMechanics is import("orbitalMechanics-v1").
-	local OrbitalParameters is import("orbitalParameters-v1").
+	local OrbitalMechanics is import("mech/orbitalMechanics-v1").
+	local OrbitalParameters is import("mech/orbitalParameters-v1").
 	local velocityChangeToNode is import("mnv/velocityChangeToNode-v1").
 
 	// returns the trueanomaly of the AN and DN nodes

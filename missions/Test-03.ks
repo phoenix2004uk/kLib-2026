@@ -1,17 +1,17 @@
-local ascent is import("ascent-v2").
+local ascent is import("prg/atmosphericAscent-v2").
 local hohmannTransfer is import("mnv/hohmannTransfer-v1").
 local changeFlybyPe is import("mnv/changeFlybyPe-v1").
-local executeNode is import("mnv/executeNode-v1").
-local altitudeSafety is import("altitudeSafety-v1").
-local descent is import("descent-v2").
-local airlessAscent is import("airlessAscent-v1").
+local executeNode is import("prg/executeNode-v1").
+local altitudeSafety is import("tlm/altitudeSafety-v1").
+local descent is import("prg/airlessDescent-v2").
+local airlessAscent is import("prg/airlessAscent-v1").
 local circularize is import("mnv/circularizeAtAp-v1").
-local returnFromMoon is import("mnv/returnFromMoon-v1").
-local atmosphericDescent is import("atmosphericDescent-v1").
-local staging is import("staging-v1").
+local returnToParent is import("mnv/returnToParent-v1").
+local atmosphericDescent is import("prg/atmosphericDescent-v1").
+local staging is import("sys/staging-v1").
 local stageUntil is staging:stageUntil.
 local autostage is staging:autostage.
-local awaitSteering is import("steering-v1"):awaitSteering.
+local awaitSteering is import("sys/steering-v1"):awaitSteering.
 clearScreen.
 
 // Mission Configuration
@@ -217,7 +217,7 @@ local returnPeriapsis is 35e3.
 			wait until attempReturn.
 			set attempReturn to false.
 
-			local returnFromMoonResult is returnFromMoon(returnPeriapsis).
+			local returnFromMoonResult is returnToParent(returnPeriapsis).
 			if not returnFromMoonResult:val {
 				dmsg("Looks like we failed to escape this SOI", true).
 			}

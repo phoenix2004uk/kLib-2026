@@ -1,6 +1,6 @@
 {
-	local autostage is import("staging-v1"):autostage.
-	local awaitSteering is import("steering-v1"):awaitSteering.
+	local autostage is import("sys/staging-v1"):autostage.
+	local awaitSteering is import("sys/steering-v1"):awaitSteering.
 
 	local ETA_KP is 3.
 	local ETA_KI is 0.

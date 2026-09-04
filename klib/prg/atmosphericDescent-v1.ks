@@ -1,6 +1,6 @@
 {
-	local awaitSteering is import("steering-v1"):awaitSteering.
-	local stageUntil is import("staging-v1"):stageUntil.
+	local awaitSteering is import("sys/steering-v1"):awaitSteering.
+	local stageUntil is import("sys/staging-v1"):stageUntil.
 
 	function atmosphericDescent {
 		parameter landingStage is 0, descentStage is 1, parachuteAltitude is 10e3, landingAltitude is 1e3.

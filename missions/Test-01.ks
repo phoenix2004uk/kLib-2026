@@ -1,6 +1,6 @@
 // #include "../lib-v1/kldr-stub.ks"
-local OrbitalParameters is import("orbitalParameters-v1").
-local orbitalMechanics is import("orbitalMechanics-v1").
+local OrbitalParameters is import("mech/orbitalParameters-v1").
+local orbitalMechanics is import("mech/orbitalMechanics-v1").
 clearScreen.
 
 // ------------------------------------------------------------

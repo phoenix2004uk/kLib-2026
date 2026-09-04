@@ -1,5 +1,5 @@
 {
-	local math is import("math-v1").
+	local math is import("util/math-v1").
 
 	// Izzo Lambert solver, adapted from ESA kep3/pykep lambert_problem.cpp (MPL-2.0):
 	// https://github.com/esa/pykep/blob/master/src/lambert_problem.cpp

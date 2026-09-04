@@ -1,6 +1,6 @@
 {
-	local printLn is import("printLn-v1"):printLn.
-	local autostage is import("staging-v1"):autostage.
+	local printLn is import("util/printLn-v1"):printLn.
+	local autostage is import("sys/staging-v1"):autostage.
 
 	// PID tuning: Kp, Ki, Kd, epsilon.
 	local VERTICAL_PID is list(0.75, 0, 0.1, 0.25).

@@ -1,6 +1,6 @@
 {
-	local OrbitalMechanics is import("orbitalMechanics-v1").
-	local OrbitalParameters is import("orbitalParameters-v1").
+	local OrbitalMechanics is import("mech/orbitalMechanics-v1").
+	local OrbitalParameters is import("mech/orbitalParameters-v1").
 	local seekNode is import("mnv/seekNode-v1").
 
 	// TODO: currently only `bodyOrbitalVelocity` is adjusted by a specified `burnUT`, we would also need to adjust: `moonOrbitAltitude`, `moonSpeed` and `returnSemiMajorAxis` (derived from `moonOrbitAltitude`)
