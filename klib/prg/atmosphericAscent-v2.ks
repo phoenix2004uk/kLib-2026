@@ -1,22 +1,106 @@
 {
 	local printLn is import("util/printLn-v1"):printLn.
 	local autostage is import("sys/staging-v1"):autostage.
-	local awaitSteering is import("sys/steering-v1"):awaitSteering.
 	
 	local ASCENT_VECTOR_BORDER is 35e3.
 	local ETA_PID_EPSILON is 1.
 	local PITCH_AOA_LIMIT is 20.
 	local AP_PID_EPSILON is 100.
+	local MIN_VERTICAL_TWR is 1.05.
+	local VERTICAL_SPEED_DEFLECTION_THRESHOLD is 350.
+	local MAXIMUM_DEFLECTION_ANGLE is 10.
+	local DEFLECTION_ANGLE_SPEED_MULTIPLIER is MAXIMUM_DEFLECTION_ANGLE / 100.
+	local ASCENT_LOG_ALTITUDE_STEP is 100.
+
+	local function displayAscent {
+		parameter apTarget, etaTarget, wantedThrottle,
+			steeringVector, currQ, maxQ.
+
+		local gravityAcceleration is body:mu / (body:radius + altitude)^2.
+		local maxTwr is ship:availableThrust / ship:mass / gravityAcceleration.
+		local currentTwr is ship:thrust / ship:mass / gravityAcceleration.
+		local targetZenith is vang(up:vector, steeringVector).
+		local facingZenith is vang(up:vector, ship:facing:foreVector).
+		local verticalTwr is currentTwr * cos(facingZenith).
+
+		printLn("Ascent", 0).
+		printLn("      Altitude: " + round(altitude/1e3, 1) + "km", 1).
+		printLn("      Apoapsis: " + round(apoapsis/1e3, 1) + "km / " + round(apTarget/1e3, 1) + "km", 2).
+		printLn("  Apoapsis ETA: " + round(eta:apoapsis, 1) + "s / " + round(etaTarget, 1) + "s", 3).
+		printLn("     Speed V/H: " + round(verticalSpeed, 0) + " / " + round(groundSpeed, 0) + "m/s", 4).
+		printLn("     Periapsis: " + round(periapsis/1e3, 1) + "km", 5).
+		printLn(" Pitch tgt/act: " + round(90 - targetZenith, 1) + " / " + round(90 - facingZenith, 1) + "deg", 6).
+		printLn("Throttle/Stage: " + round(wantedThrottle * 100, 0) + "% / " + stage:number, 7).
+		printLn("  TWR max/vert: " + round(maxTwr, 2) + " / " + round(verticalTwr, 2), 8).
+		printLn("         Q/max: " + round(currQ, 2) + " / " + round(maxQ, 2) + "kPa", 9).
+	}
+
+	local function logAscent {
+		parameter phase, apTarget, etaTarget, wantedThrottle,
+			steeringVector, currQ, maxQ.
+
+		local gravityAcceleration is body:mu / (body:radius + altitude)^2.
+		local maxTwr is ship:availableThrust / ship:mass / gravityAcceleration.
+		local currentTwr is ship:thrust / ship:mass / gravityAcceleration.
+		local targetZenith is vang(up:vector, steeringVector).
+		local facingZenith is vang(up:vector, ship:facing:foreVector).
+		local verticalTwr is currentTwr * cos(facingZenith).
+
+		dmsg(
+			"Ascent: " + phase +
+			"; ut=" + round(time:seconds, 1) +
+			"; altitude=" + round(altitude, 0) +
+			"m; apoapsis=" + round(apoapsis, 0) +
+			"/" + round(apTarget, 0) +
+			"m; eta=" + round(eta:apoapsis, 1) +
+			"/" + round(etaTarget, 1) +
+			"s; vertical=" + round(verticalSpeed, 1) +
+			"m/s; ground=" + round(groundSpeed, 1) +
+			"m/s; periapsis=" + round(periapsis, 0) +
+			"m; pitch=" + round(90 - targetZenith, 1) +
+			"/" + round(90 - facingZenith, 1) +
+			"deg; error=" +
+			round(vang(steeringVector, ship:facing:foreVector), 1) +
+			"deg; throttle=" +
+			round(wantedThrottle * 100, 1) +
+			"%; twr=" + round(maxTwr, 2) +
+			"; currentTwr=" + round(currentTwr, 2) +
+			"; verticalTwr=" + round(verticalTwr, 2) +
+			"; q=" + round(currQ, 2) +
+			"/" + round(maxQ, 2) +
+			"kPa; stage=" + stage:number
+		).
+	}
 
 	local function executeAscent {
-		parameter apTarget, incTarget is 0, firstPitch is 80, minVerticalSpeed is 50.
+		parameter apTarget, incTarget is 0, firstPitch is 80, minVerticalSpeed is 50, throttleControlSpeed is 250.
 
 		local launchDirection is 90 - incTarget.
 		local pitchTarget is 90.
 		lock steering to heading(launchDirection, pitchTarget).
 
 		local wantedThrottle is 1.
+		local lock pitchDeflection to min(
+			MAXIMUM_DEFLECTION_ANGLE,
+			max(
+				0,
+				(verticalSpeed - VERTICAL_SPEED_DEFLECTION_THRESHOLD) * DEFLECTION_ANGLE_SPEED_MULTIPLIER
+			)
+		).
 		lock throttle to wantedThrottle.
+
+		local lock vPrograde to
+			choose srfPrograde
+			if altitude < ASCENT_VECTOR_BORDER
+			else prograde.
+		local lock pitchCurrent to 90 - vang(up:vector, ship:facing:foreVector).
+		local lock pitchHeading to 90 - vang(up:vector, vPrograde:vector).
+		local lock vSteer to heading(launchDirection, pitchHeading - pitchDeflection).
+
+		local nextLogAltitude is (floor(altitude / ASCENT_LOG_ALTITUDE_STEP) + 1) * ASCENT_LOG_ALTITUDE_STEP.
+		local lock etaTarget to max(15, min(75, 15 + altitude / 1e3)).
+		local lock currQ to ship:q * constant:ATMtokPa.
+		local maxQ is 0.
 
 		clearScreen.
 		wait 1.
@@ -24,49 +108,170 @@
 		printLn("Ignition").
 		wait until stage:ready.
 		printLn("Liftoff!").
-		wait until verticalSpeed >= minVerticalSpeed.
-
-		printLn("Pitching to " + firstPitch + "°").
-		set pitchTarget to firstPitch.
-		awaitSteering().
-
-		printLn("Performing gravity turn").
-		wait until vang(srfPrograde:vector, facing:vector) < 0.3.
-
-		printLn("Following surface prograde").
-		when altitude > ASCENT_VECTOR_BORDER then printLn("Following orbit prograde").
-		local lock vPrograde to choose prograde if altitude > ASCENT_VECTOR_BORDER else srfPrograde.
-		local lock pitchCurrent to 90 - vang(UP:vector, vPrograde:vector).
-		lock steering to vPrograde.
-
-		local pidThrottle is pidLoop(0.05, 0.0005, 0.01, 0.1, 1, ETA_PID_EPSILON).
-		set pidThrottle:setpoint to 75.
-
-		local lock currQ to ship:q * constant:ATMtokPa.
-		local maxQ is 0.
-
-		until apoapsis >= apTarget {
+		until verticalSpeed >= minVerticalSpeed {
 			set maxQ to max(maxQ, currQ).
-			printLn("    Altitude: " + round(altitude/1e3,1) + "km", 1).
-			printLn("    Apoapsis: " + round(apoapsis/1e3,1) + "km / " + round(apTarget/1e3,1) + "km", 2).
-			printLn("Apoapsis ETA: " + round(eta:apoapsis,1) + "s / " + round(pidThrottle:setpoint,1) + "s", 3).
-			printLn(" Speed{vert}: " + round(verticalSpeed,0) + "m/s", 4).
-			printLn(" Speed{horz}: " + round(ship:groundSpeed,0) + "m/s", 5).
-			printLn("   Periapsis: " + round(periapsis/1e3,1) + "km", 6).
-			printLn("       Pitch: " + round(pitchCurrent,1) + "°", 7).
-			printLn("           Q: " + round(currQ,2) + "kPA", 8).
-			printLn("      Q{max}: " + round(maxQ,2) + "kPA", 9).
 
-			set wantedThrottle to choose 1 if altitude > 60e3 else pidThrottle:update(time:seconds, eta:apoapsis).
+			if altitude >= nextLogAltitude {
+				logAscent(
+					"ascent",
+					apTarget,
+					etaTarget,
+					wantedThrottle,
+					vSteer:vector,
+					currQ,
+					maxQ
+				).
+				set nextLogAltitude to (floor(altitude / ASCENT_LOG_ALTITUDE_STEP) + 1) * ASCENT_LOG_ALTITUDE_STEP.
+			}
+
 			autostage().
 			wait 0.
 		}
-		
+
+		printLn("Pitching to " + firstPitch + "°").
+		set pitchTarget to firstPitch.
+
+		printLn("Performing gravity turn").
+		until vang(up:vector, srfPrograde:vector) > 90 - firstPitch {
+			set maxQ to max(maxQ, currQ).
+
+			if altitude >= nextLogAltitude {
+				logAscent(
+					"ascent",
+					apTarget,
+					etaTarget,
+					wantedThrottle,
+					vSteer:vector,
+					currQ,
+					maxQ
+				).
+				set nextLogAltitude to (floor(altitude / ASCENT_LOG_ALTITUDE_STEP) + 1) * ASCENT_LOG_ALTITUDE_STEP.
+			}
+
+			autostage().
+			wait 0.
+		}
+
+		printLn("Following surface prograde").
+		lock steering to vSteer.
+
+		local pidThrottle is pidLoop(0.05, 0.0005, 0.01, 0.1, 1, ETA_PID_EPSILON).
+
+		logAscent(
+			"following prograde",
+			apTarget,
+			etaTarget,
+			wantedThrottle,
+			vSteer:vector,
+			currQ,
+			maxQ
+		).
+
+		local throttleControlEnabled is false.
+		until apoapsis >= apTarget {
+			if not throttleControlEnabled and verticalSpeed >= throttleControlSpeed {
+				set throttleControlEnabled to true.
+			}
+			set maxQ to max(maxQ, currQ).
+
+			displayAscent(
+				apTarget,
+				etaTarget,
+				wantedThrottle,
+				vSteer:vector,
+				currQ,
+				maxQ
+			).
+
+			if altitude >= nextLogAltitude {
+				logAscent(
+					"ascent",
+					apTarget,
+					etaTarget,
+					wantedThrottle,
+					vSteer:vector,
+					currQ,
+					maxQ
+				).
+				set nextLogAltitude to (floor(altitude / ASCENT_LOG_ALTITUDE_STEP) + 1) * ASCENT_LOG_ALTITUDE_STEP.
+			}
+
+			set pidThrottle:setpoint to etaTarget.
+			
+			local gravityAcceleration is body:mu / (body:radius + altitude)^2.
+			local maxTwr is ship:availablethrust / ship:mass / gravityAcceleration.
+			local maxVerticalTwr is maxTwr * sin(pitchCurrent).
+			local minThrottle is 0.
+			if altitude < ASCENT_VECTOR_BORDER
+			or groundSpeed < 2 * verticalSpeed {
+				set minThrottle to
+					choose min(1, MIN_VERTICAL_TWR / maxVerticalTwr)
+					if maxVerticalTwr > 0
+					else 1.
+			}
+
+			set wantedThrottle to 
+				choose max(minThrottle, pidThrottle:update(time:seconds, eta:apoapsis))
+				if throttleControlEnabled
+				else 1.
+
+			if autostage() {
+				logAscent(
+					"staged",
+					apTarget,
+					etaTarget,
+					wantedThrottle,
+					vSteer:vector,
+					currQ,
+					maxQ
+				).
+			}
+
+			wait 0.
+		}
+
+		logAscent(
+			"apoapsis target",
+			apTarget,
+			etaTarget,
+			wantedThrottle,
+			vSteer:vector,
+			currQ,
+			maxQ
+		).
+
 		clearScreen.
-		printLn("Coasting to space").
+		printLn("Maintaining apoapsis").
+		local pidApHold is pidLoop(0.0001, 0.00001, 0, 0, 1, AP_PID_EPSILON).
+		set pidApHold:setpoint to apTarget.
+		until altitude >= body:atm:height {
+			if altitude >= nextLogAltitude {
+				logAscent(
+					"ascent",
+					apTarget,
+					etaTarget,
+					wantedThrottle,
+					vSteer:vector,
+					currQ,
+					maxQ
+				).
+				set nextLogAltitude to (floor(altitude / ASCENT_LOG_ALTITUDE_STEP) + 1) * ASCENT_LOG_ALTITUDE_STEP.
+			}
+
+			set wantedThrottle to pidApHold:update(time:seconds, apoapsis).
+			autostage().
+			wait 0.
+		}
+
 		lock throttle to 0.
+	}
+
+	function ascentHandoff {
+		clearScreen.
+		printLn("Coasting towards apoapsis").
+		lock throttle to 0.
+		lock steering to prograde.
 		wait 0.1.
-		wait until altitude > body:atm:height.
 	}
 
 	function orbitalInsertion {
@@ -75,6 +280,12 @@
 			etaTarget is 60,
 			etaMin is 30,
 			peTarget is 35_000.
+
+		local lock handoffCondition to periapsis > peTarget or eta:apoapsis < etaMin or eta:periapsis < eta:apoapsis or apoapsis > (apTarget + apMaxError).
+		if handoffCondition {
+			ascentHandoff().
+			return.
+		}
 
 		clearScreen.
 		printLn("Orbital Insertion").
@@ -89,16 +300,23 @@
 		local lock radialPerp to vxcl(vPrograde, vRadial):normalized.
 		local lock vSteer to vPrograde * cos(pitch) - radialPerp * sin(pitch).
 		lock steering to vSteer.
-		awaitSteering().
+
+		printLn("Orbital Insertion - awaiting atmospheric border: " + body:atm:height).
+		wait until altitude > body:atm:height + 50.
+		kuniverse:timewarp:cancelwarp().
+		wait until kuniverse:timewarp:issettled().
+
 		printLn("Orbital Insertion - awaiting eta:apoapsis < " + etaTarget).
 		wait until eta:apoapsis <= etaTarget or eta:periapsis < eta:apoapsis.
-		printLn("Orbital Insertion - raising Pe").
+		kuniverse:timewarp:cancelwarp().
+		wait until kuniverse:timewarp:issettled().
 
+		printLn("Orbital Insertion - raising Pe").
 		local dThrottle is 0.1.
 		lock throttle to dThrottle.
 		set pidThrottle:setpoint to etaTarget.
 		set pidPitch:setpoint to apTarget.
-		until periapsis > peTarget or eta:apoapsis < etaMin or eta:periapsis < eta:apoapsis or apoapsis > (apTarget + apMaxError) {
+		until handoffCondition {
 			printLn("Apoapsis:       " + round(apoapsis/1e3, 1) + "km / " + round(apTarget/1e3, 1) + "km", 1).
 			printLn("Apoapsis Error: " + round((apoapsis - apTarget)/1e3, 1) + "km / " + round(apMaxError/1e3, 1) + "km", 2).
 			printLn("Apoapsis ETA:   " + round(eta:apoapsis, 1) + "s / " + round(etaTarget, 1) + "s", 3).
@@ -111,12 +329,7 @@
 			wait 0.
 		}
 
-		clearScreen.
-		printLn("Coasting towards apoapsis").
-		lock throttle to 0.
-		lock steering to prograde.
-		awaitSteering().
-		wait 0.1.
+		ascentHandoff().
 	}
 
 	export(lex(

@@ -1,9 +1,13 @@
 {
+	function isSettled {
+		return vang(ship:facing:vector, steeringManager:target:vector) < 0.25.
+	}
 	function awaitSteering {
 		wait 0.
-		wait until vang(ship:facing:vector, steeringManager:target:vector) < 0.25.
+		wait until isSettled().
 	}
 	export(lex(
-		"awaitSteering", awaitSteering@
+		"awaitSteering", awaitSteering@,
+		"isSettled", isSettled@
 	)).
 }

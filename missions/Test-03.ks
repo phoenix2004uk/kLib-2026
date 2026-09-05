@@ -11,7 +11,9 @@ local atmosphericDescent is import("prg/atmosphericDescent-v1").
 local staging is import("sys/staging-v1").
 local stageUntil is staging:stageUntil.
 local autostage is staging:autostage.
-local awaitSteering is import("sys/steering-v1"):awaitSteering.
+local steeringSystem is import("sys/steering-v1").
+local awaitSteering is steeringSystem:awaitSteering.
+local steeringSettled is steeringSystem:isSettled.
 clearScreen.
 
 // Mission Configuration
@@ -51,8 +53,9 @@ local returnPeriapsis is 35e3.
 
 	// Mission Steps
 	function prelaunch {
-		dmsg("Launching in 10 seconds", true).
-		wait 10.
+		dmsg("Launching in 3 seconds", true).
+		lights on.
+		wait 3.
 	}
 
 	function kerbinLaunch {
@@ -69,9 +72,11 @@ local returnPeriapsis is 35e3.
 			shutdown.
 		}
 
+		rcs on.
 		add circularizeResult:val.
-		executeNode:warpToNode(15).
-		executeNode:executeNode(15).
+		if steeringSettled() executeNode:warpToNode(60).
+		executeNode:executeNode(60).
+		rcs off.
 	}
 
 	function kerbinOrbit {

@@ -1,1 +1,1 @@
-{export(lex("awaitSteering",{wait 0. wait until vang(ship:facing:vector,steeringManager:target:vector)<0.25.})).}
+{function A{return vang(ship:facing:vector,steeringManager:target:vector)<0.25.}export(lex("awaitSteering",{wait 0. wait until A().},"isSettled",A@)).}
