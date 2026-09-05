@@ -1,0 +1,1 @@
+{local lock A to mass*body:mu/(body:radius+altitude)^2. local lock B to vang(up:vector,facing:vector).function C{return ship:availableThrust/A.}function D{return ship:thrust/A.}export(lex("available",C@,"vAvailable",{return C()*cos(B).},"hAvailable",{return C()*sin(B).},"current",D@,"vCurrent",{return D()*cos(B).},"hCurrent",{return D()*sin(B).})).}

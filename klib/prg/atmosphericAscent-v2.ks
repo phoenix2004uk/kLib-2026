@@ -1,6 +1,7 @@
 {
 	local printLn is import("util/printLn-v1"):printLn.
 	local autostage is import("sys/staging-v1"):autostage.
+	local twr is import("tlm/twr-v1").
 	
 	local ASCENT_VECTOR_BORDER is 35e3.
 	local ETA_PID_EPSILON is 1.
@@ -16,12 +17,10 @@
 		parameter apTarget, etaTarget, wantedThrottle,
 			steeringVector, currQ, maxQ.
 
-		local gravityAcceleration is body:mu / (body:radius + altitude)^2.
-		local maxTwr is ship:availableThrust / ship:mass / gravityAcceleration.
-		local currentTwr is ship:thrust / ship:mass / gravityAcceleration.
+		local availableTwr is twr:available().
 		local targetZenith is vang(up:vector, steeringVector).
-		local facingZenith is vang(up:vector, ship:facing:foreVector).
-		local verticalTwr is currentTwr * cos(facingZenith).
+		local facingZenith is vang(up:vector, facing:vector).
+		local verticalTwr is twr:vCurrent().
 
 		printLn("Ascent", 0).
 		printLn("      Altitude: " + round(altitude/1e3, 1) + "km", 1).
@@ -31,7 +30,7 @@
 		printLn("     Periapsis: " + round(periapsis/1e3, 1) + "km", 5).
 		printLn(" Pitch tgt/act: " + round(90 - targetZenith, 1) + " / " + round(90 - facingZenith, 1) + "deg", 6).
 		printLn("Throttle/Stage: " + round(wantedThrottle * 100, 0) + "% / " + stage:number, 7).
-		printLn("  TWR max/vert: " + round(maxTwr, 2) + " / " + round(verticalTwr, 2), 8).
+		printLn("  TWR max/vert: " + round(availableTwr, 2) + " / " + round(verticalTwr, 2), 8).
 		printLn("         Q/max: " + round(currQ, 2) + " / " + round(maxQ, 2) + "kPa", 9).
 	}
 
@@ -39,12 +38,11 @@
 		parameter phase, apTarget, etaTarget, wantedThrottle,
 			steeringVector, currQ, maxQ.
 
-		local gravityAcceleration is body:mu / (body:radius + altitude)^2.
-		local maxTwr is ship:availableThrust / ship:mass / gravityAcceleration.
-		local currentTwr is ship:thrust / ship:mass / gravityAcceleration.
+		local availableTwr is twr:available().
+		local currentTwr is twr:current().
 		local targetZenith is vang(up:vector, steeringVector).
-		local facingZenith is vang(up:vector, ship:facing:foreVector).
-		local verticalTwr is currentTwr * cos(facingZenith).
+		local facingZenith is vang(up:vector, facing:vector).
+		local verticalTwr is twr:vCurrent().
 
 		dmsg(
 			"Ascent: " + phase +
@@ -60,10 +58,10 @@
 			"m; pitch=" + round(90 - targetZenith, 1) +
 			"/" + round(90 - facingZenith, 1) +
 			"deg; error=" +
-			round(vang(steeringVector, ship:facing:foreVector), 1) +
+			round(vang(steeringVector, facing:vector), 1) +
 			"deg; throttle=" +
 			round(wantedThrottle * 100, 1) +
-			"%; twr=" + round(maxTwr, 2) +
+			"%; twr=" + round(availableTwr, 2) +
 			"; currentTwr=" + round(currentTwr, 2) +
 			"; verticalTwr=" + round(verticalTwr, 2) +
 			"; q=" + round(currQ, 2) +
@@ -93,7 +91,7 @@
 			choose srfPrograde
 			if altitude < ASCENT_VECTOR_BORDER
 			else prograde.
-		local lock pitchCurrent to 90 - vang(up:vector, ship:facing:foreVector).
+
 		local lock pitchHeading to 90 - vang(up:vector, vPrograde:vector).
 		local lock vSteer to heading(launchDirection, pitchHeading - pitchDeflection).
 
@@ -197,16 +195,14 @@
 			}
 
 			set pidThrottle:setpoint to etaTarget.
-			
-			local gravityAcceleration is body:mu / (body:radius + altitude)^2.
-			local maxTwr is ship:availablethrust / ship:mass / gravityAcceleration.
-			local maxVerticalTwr is maxTwr * sin(pitchCurrent).
+
+			local availableVerticalTwr is twr:vAvailable().
 			local minThrottle is 0.
 			if altitude < ASCENT_VECTOR_BORDER
 			or groundSpeed < 2 * verticalSpeed {
 				set minThrottle to
-					choose min(1, MIN_VERTICAL_TWR / maxVerticalTwr)
-					if maxVerticalTwr > 0
+					choose min(1, MIN_VERTICAL_TWR / availableVerticalTwr)
+					if availableVerticalTwr > 0
 					else 1.
 			}
 
@@ -323,8 +319,8 @@
 			printLn("Periapsis:      " + round(periapsis/1e3, 1) + "km / " + round(peTarget/1e3, 1) + "km", 4).
 			printLn("Pitch Angle:    " + round(pitch, 2) + "°", 5).
 
-			set dThrottle to pidThrottle:update(time:second, eta:apoapsis).
-			set pitch to pidPitch:update(time:second, apoapsis).
+			set dThrottle to pidThrottle:update(time:seconds, eta:apoapsis).
+			set pitch to pidPitch:update(time:seconds, apoapsis).
 			autostage().
 			wait 0.
 		}
