@@ -1,7 +1,9 @@
 local ascent is import("prg/atmosphericAscent-v2").
 local hohmannTransfer is import("mnv/hohmannTransfer-v1").
 local changeFlybyPe is import("mnv/changeFlybyPe-v1").
-local executeNode is import("prg/executeNode-v1").
+local pExecuteNode is import("prg/executeNode-v1").
+local executeNode is pExecuteNode:executeNode.
+local warpToNode is pExecuteNode:warpToNode.
 local altitudeSafety is import("tlm/altitudeSafety-v1").
 local descent is import("prg/airlessDescent-v2").
 local airlessAscent is import("prg/airlessAscent-v1").
@@ -39,7 +41,7 @@ local returnPeriapsis is 35e3.
 	{
 		local returnToOrbit is false.
 		on abort set returnToOrbit to true.
-		dmsg("Use ABORT to trigger ascent", true).
+		notify("Press ABORT to launch from Mun").
 		wait until returnToOrbit.
 
 		moonAscent(moonAscentHeading, moonAscentApoapsis).
@@ -51,34 +53,41 @@ local returnPeriapsis is 35e3.
 
 	// Mission Steps
 	function prelaunch {
-		dmsg("Launching in 3 seconds", true).
+		notify("Launch in 3 seconds").
 		lights on.
 		wait 3.
 	}
 
 	function kerbinLaunch {
 		parameter launchApoapsis, launchInclination is 0.
+
+		notify("Beginning Kerbin ascent").
 		ascent:executeAscent(launchApoapsis, launchInclination).
 
+		notify("Beginning orbital insertion").
 		ascent:orbitalInsertion(launchApoapsis).
 		stageUntil(3).
 	}
 
 	function kerbinCircularization {
+		notify("Planning Kerbin circularization").
 		local circularizeResult is circularize().
 		if not circularizeResult:ok {
-			dmsg("Failed to plan maneuver", true).
+			notify("Circularization failed - shutting down").
+			dmsg("Circularization planning failed: " + circularizeResult:msg, true).
 			shutdown.
 		}
 
 		rcs on.
 		add circularizeResult:val.
-		if steeringSettled() executeNode:warpToNode(60).
-		executeNode:executeNode(60).
+		if steeringSettled() warpToNode(60).
+		notify("Executing Kerbin circularization").
+		executeNode(60).
 		rcs off.
 	}
 
 	function kerbinOrbit {
+		notify("Kerbin orbit achieved").
 		toggle ag1.
 		lights on.
 	}
@@ -86,80 +95,95 @@ local returnPeriapsis is 35e3.
 	function transferToMoon {
 		parameter targetBody.
 
-		dmsg("Preparing trasfer to: " + targetBody, true).
+		notify("Planning transfer to " + targetBody:name).
+		dmsg("Planning transfer to " + targetBody:name, true).
 		set target to targetBody.
 		wait 10.
 
 		local hohmannResult is hohmannTransfer(targetBody).
 		if not hohmannResult:ok {
-			dmsg("Something went wrong", true).
-			dmsg(hohmannResult:msg, true).
-			dmsg("Shutting down", true).
+			notify("Transfer failed - shutting down").
+			dmsg("Transfer planning failed: " + hohmannResult:msg, true).
 			shutdown.
 		}
 
 		add hohmannResult:val.
-		executeNode:warpToNode(15).
-		executeNode:executeNode(15).
+		notify("Executing transfer to " + targetBody:name).
+		warpToNode(15).
+		executeNode(15).
 
 		if not (obt:hasnextpatch and obt:nextpatch:body = targetBody) {
-			dmsg("We didn't make it to " + targetBody:name, true).
-			dmsg("Shutting down", true).
+			notify("Transfer failed - shutting down").
+			dmsg("Transfer did not reach " + targetBody:name, true).
 			shutdown.
 		}
+
+		notify(targetBody:name + " encounter confirmed").
+		dmsg(targetBody:name + " encounter confirmed", true).
 	}
 
 	function awaitSOIChange {
 		parameter targetBody.
 
-		dmsg("Waiting for SOI change: " + targetBody:name, true).
+		notify("Coasting to " + targetBody:name + " SOI").
+		dmsg("Awaiting SOI change to " + targetBody:name, true).
 		warpTo(time:seconds + eta:transition).
 		wait until obt:body = targetBody.
 		kuniverse:timewarp:cancelwarp().
 		wait until kuniverse:timewarp:issettled.
 
-		// wait 30 seconds to ensure SOI transition has settled
+		// wait 10 seconds to ensure SOI transition has settled
 		local soiChangeUT is time:seconds.
-		warpTo(soiChangeUT + 30).
-		wait until time:seconds >= soiChangeUT + 30.
+		warpTo(soiChangeUT + 10).
+		wait until time:seconds >= soiChangeUT + 10.
 		kuniverse:timewarp:cancelwarp().
 		wait until kuniverse:timewarp:issettled.
+
+		notify("Entered " + targetBody:name + " SOI").
+		dmsg("SOI change complete: " + targetBody:name, true).
 	}
 
 	function trimMoonFlyby {
 		parameter targetPeriapsis.
-		dmsg("Attempt to change periapsis to 50m above the highest terrain altitude", true).
+
+		notify("Trimming Mun approach").
+		dmsg("Targeting periapsis 50 m above highest terrain", true).
+
 		local altitudeSafetyResult is altitudeSafety:altitude(body).
 		if not altitudeSafetyResult:ok {
-			dmsg("Something went wrong", true).
-			dmsg(altitudeSafetyResult:msg, true).
-			dmsg("Shutting down", true).
+			notify("Approach trim failed - shutting down").
+			dmsg("Terrain height check failed: " + altitudeSafetyResult:msg, true).
 			shutdown.
 		}
-		dmsg("  max terrain altitude = " + altitudeSafetyResult:val, true).
+		dmsg("Maximum terrain altitude: " + altitudeSafetyResult:val + " m", true).
 
 		local safeAltitudeMargin is 50.
 		local peMargin is 5.
-		local flybyPeriapsis is max(targetPeriapsis, altitudeSafetyResult:val + safeAltitudeMargin).
+		local flybyPeriapsis is max(
+			targetPeriapsis,
+			altitudeSafetyResult:val + safeAltitudeMargin
+		).
 		local flybyResult is changeFlybyPe(flybyPeriapsis, 60, peMargin).
 		if not flybyResult:ok {
-			dmsg("Something went wrong", true).
-			dmsg(flybyResult:msg, true).
-			dmsg("Shutting down", true).
+			notify("Approach trim failed - shutting down").
+			dmsg("Approach trim planning failed: " + flybyResult:msg, true).
 			shutdown.
 		}
-		add flybyResult:val.
-		dmsg("  node delta-v = " + round(flybyResult:val:deltav:mag, 3), true).
-		executeNode:warpToNode(15).
-		executeNode:executeNode(15).
 
-		dmsg("Trim maneuver complete", true).
-		dmsg("  target periapsis = " + round(altitudeSafetyResult:val + safeAltitudeMargin, 1), true).
-		dmsg("  error = " + round(obt:periapsis - (altitudeSafetyResult:val + safeAltitudeMargin), 1), true).
+		add flybyResult:val.
+
+		warpToNode(15).
+		executeNode(15).
+
+		notify(targetBody:name + " periapsis targeted: " + round(periapsis / 1e3, 0) + " km").
+		dmsg("Approach trim complete", true).
+		dmsg("Target periapsis: " + round(flybyPeriapsis, 1) + " m", true).
+		dmsg("Periapsis error: " + round(obt:periapsis - flybyPeriapsis, 1) + " m", true).
 	}
 
 	function moonDeorbitAtPeriapsis {
-		dmsg("Performing de-orbit burn", true).
+		notify("Executing " + targetBody:name + " deorbit burn").
+		dmsg("Executing " + targetBody:name + " deorbit burn", true).
 
 		if eta:periapsis > 15 {
 			local deorbitUT is time:seconds + eta:periapsis.
@@ -178,72 +202,100 @@ local returnPeriapsis is 35e3.
 			wait 0.
 		}
 		lock throttle to 0.
+
+		notify(targetBody:name + " descent trajectory established").
+		dmsg(targetBody:name + " descent trajectory established", true).
 	}
 
 	function moonDescent {
-		dmsg("Switch to descent guidance", true).
+		notify(targetBody:name + " descent guidance active").
+		dmsg("Starting " + targetBody:name + " descent guidance", true).
 		descent().
 		clearScreen.
+
+		notify("Landed on " + targetBody:name).
+		dmsg(targetBody:name + " landing complete", true).
 	}
 
 	function moonAscent {
 		parameter moonAscentHeading, moonAscentApoapsis.
+
+		notify(targetBody:name + " ascent guidance active").
+		dmsg("Starting " + targetBody:name + " ascent guidance", true).
+
 		local ascentState is airlessAscent(moonAscentHeading, moonAscentApoapsis).
 		if ascentState <> "ORBITING" and ascentState <> "SUB_ORBITAL" {
-			dmsg("Ascent failed: " + ascentState, true).
+			notify(targetBody:name + " ascent failed - shutting down").
+			dmsg(targetBody:name + " ascent failed: " + ascentState, true).
 			shutdown.
 		}
 	}
 
 	function moonCircularization {
+		notify("Planning " + targetBody:name + " circularization").
 		local circularizeResult is circularize().
 		if not circularizeResult:ok {
-			dmsg("Failed to plan maneuver", true).
+			notify("Circularization failed - shutting down").
+			dmsg("Circularization planning failed: " + circularizeResult:msg, true).
 			shutdown.
 		}
 
 		add circularizeResult:val.
-		executeNode:warpToNode(15).
-		executeNode:executeNode(15).
-		dmsg("We should be in a stable orbit", true).
+		notify("Executing " + targetBody:name + " circularization").
+		warpToNode(15).
+		executeNode(15).
+
+		notify(targetBody:name + " orbit achieved").
+		dmsg("Stable " + targetBody:name + " orbit achieved", true).
 	}
 
 	function returnToKerbin {
 		parameter returnPeriapsis.
+
 		local returnSuccess is false.
 		local attempReturn is false.
 
 		until returnSuccess {
-			dmsg("Use ABORT to trigger return attempt", true).
+			notify("Press ABORT to attempt return").
 			set attempReturn to false.
 			on abort set attempReturn to true.
 
 			wait until attempReturn.
 			set attempReturn to false.
 
+			notify("Planning return to Kerbin").
+			dmsg("Planning return to Kerbin", true).
+
 			local returnFromMoonResult is returnToParent(returnPeriapsis).
 			if not returnFromMoonResult:val {
-				dmsg("Looks like we failed to escape this SOI", true).
+				notify("Return attempt failed").
+				dmsg("Failed to escape " + targetBody:name + " SOI", true).
 			}
 			else {
 				set returnSuccess to true.
+
 				if not returnFromMoonResult:ok {
-					dmsg("Looks like we will make another encounter before periapsis", true).
-					dmsg("Proceeding anyway", true).
+					notify("Return trajectory has additional encounter").
+					dmsg("Return trajectory encounters another body before periapsis", true).
+					dmsg("Proceeding with return trajectory", true).
 				}
 
-				dmsg("Ejection burn added to flight-plan", true).
-				executeNode:warpToNode(15).
-				executeNode:executeNode(15).
+				notify("Executing Kerbin ejection burn").
+				dmsg("Kerbin ejection maneuver added", true).
+				warpToNode(15).
+				executeNode(15).
 			}
 		}
 	}
 
 	function kerbinReentry {
 		// 10 minutes before periapsis
+		notify("Coasting to Kerbin reentry").
 		warpTo(time:seconds + eta:periapsis - 600).
 		wait until kuniverse:timewarp:issettled.
 
+		notify("Preparing for reentry - communications disabled").
+		dmsg("Beginning Kerbin reentry", true).
 		toggle ag1. // disable antenna
 		atmosphericDescent().
 	}

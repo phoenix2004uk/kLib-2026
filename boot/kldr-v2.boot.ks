@@ -59,6 +59,11 @@ clearScreen.
 		}
 	}.
 
+	global notify is {
+		parameter _kMessage.
+		hudtext(_kMessage, 5, 2, 20, YELLOW, false).
+	}.
+
 	global ApiOK is {
 		parameter _kValue is true, _kMessage is "".
 

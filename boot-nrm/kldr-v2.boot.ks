@@ -40,6 +40,10 @@ clearScreen.
 		}
 		else if volume(1):freespace-_kMessage:length>500 log _kMessage to _kDmsgBufferFile.
 	}.
+	global notify is{
+		parameter _kMessage.
+		hudtext(_kMessage,5,2,20,YELLOW,false).
+	}.
 	global ApiOK is{
 		parameter _kValue is true,_kMessage is"".
 		return lex("ok",true,"val",_kValue,"msg",_kMessage).

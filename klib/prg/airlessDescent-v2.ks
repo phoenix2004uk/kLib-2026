@@ -1,6 +1,7 @@
 {
 	local printLn is import("util/printLn-v1"):printLn.
 	local autostage is import("sys/staging-v1"):autostage.
+	local createSmoothThrottle is import("sys/smoothThrottle-v1").
 
 	// PID tuning: Kp, Ki, Kd, epsilon.
 	local VERTICAL_PID is list(0.75, 0, 0.1, 0.25).
@@ -201,13 +202,16 @@
 	}
 
 	function descent {
-		local wantedThrottle is 0.
 		local targetVerticalSpeed is 0.
 		local maxGroundSpeed is DESCENT_PROFILE[0][2].
 		local steeringVector is up:vector.
 		local verticalThrustAcceleration is 0.
 		local horizontalThrustAcceleration is 0.
-		lock throttle to wantedThrottle.
+
+		local wantedThrottle is throttle.
+		local smoothThrottle is createSmoothThrottle().
+		smoothThrottle:reset(wantedThrottle).
+		lock throttle to smoothThrottle:current().
 
 		local vesselBounds is ship:bounds.
 		local boundedByLandingLegs is false.
@@ -216,12 +220,12 @@
 		clearScreen.
 
 		if not surfaceContact() {
-			set wantedThrottle to 0.
+			set wantedThrottle to throttle.
 			set steeringVector to up:vector.
-			lock steering to
-				choose lookDirUp(steeringVector, sun:position)
-				if maxGroundSpeed <= 0
-				else steeringVector.
+			lock steering to lookDirUp(steeringVector, sun:position).
+				// choose lookDirUp(steeringVector, sun:position)
+				// if maxGroundSpeed <= 0
+				// else steeringVector.
 
 			local verticalPid is pidLoop(
 				VERTICAL_PID[0],
@@ -299,6 +303,7 @@
 				).
 				set steeringVector to descentCommand[0].
 				set wantedThrottle to descentCommand[1].
+				smoothThrottle:setTarget(wantedThrottle).
 				set verticalThrustAcceleration to descentCommand[2].
 				set horizontalThrustAcceleration to descentCommand[3].
 
@@ -317,6 +322,7 @@
 				wait 0.
 			}
 		}
+		smoothThrottle:setTarget(0).
 
 		local impactVelocityMagnitude is ship:velocity:surface:mag.
 		local resultStatus is
