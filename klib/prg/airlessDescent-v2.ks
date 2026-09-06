@@ -25,7 +25,7 @@
 	local GEAR_DEPLOYMENT_ALTITUDE is 1000.
 	local CRASHED_IMPACT_SPEED is 10.
 
-	local function descentTargets {
+	function descentTargets {
 		parameter bottomAltRadar.
 
 		local firstStep is DESCENT_PROFILE[0].
@@ -59,7 +59,7 @@
 
 	// Construct the required thrust-acceleration vector.
 	// Vertical control has priority over horizontal braking.
-	local function descentControl {
+	function descentControl {
 		parameter verticalPid, horizontalPid,
 			targetVerticalSpeed, maxGroundSpeed, fallbackVector.
 
@@ -141,11 +141,11 @@
 		).
 	}
 
-	local function surfaceContact {
+	function surfaceContact {
 		return status = "LANDED" or status = "SPLASHED".
 	}
 
-	local function displayDescent {
+	function displayDescent {
 		parameter phase, bottomAltRadar, targetVerticalSpeed, maxGroundSpeed,
 			wantedThrottle, verticalThrustAcceleration is 0,
 			horizontalThrustAcceleration is 0.
@@ -176,13 +176,13 @@
 		).
 		printLn(
 			"Zenith:         " +
-			round(vang(ship:facing:foreVector, up:vector), 1) + " deg",
+			round(vang(facing:vector, up:vector), 1) + " deg",
 			7
 		).
 		printLn("Status:         " + status, 8).
 	}
 
-	local function logDescent {
+	function logDescent {
 		parameter phase, bottomAltRadar, targetVerticalSpeed, maxGroundSpeed,
 			wantedThrottle, steeringVector.
 
@@ -343,6 +343,7 @@
 		lock steering to lookDirUp(up:vector, sun:position).
 		wait 10.
 
+		unlock bottomAltRadar.
 		unlock throttle.
 		unlock steering.
 		wait until not steeringManager:enabled.

@@ -9,13 +9,16 @@
 	local ETA_MAX_PITCH is 90.
 	local ETA_EPSILON is 1.
 	local MINIMUM_VERTICAL_CLIMB is 10.
+	local VERTICAL_CLIMB_ETA_TARGET is 15.
+	local LAUNCH_AP_ETA_TARGET is 30.
+	local MINIMUM_AP_LEAD_TIME is 10.
 
-	local function surfaceContact {
+	function surfaceContact {
 		return status = "LANDED" or status = "SPLASHED".
 	}
 
 	function airlessAscent {
-		parameter ascentHeading, targetApoapsis, climbApEtaTarget is 30, launchApEtaTarget is 15, etaFinalMargin is 10.
+		parameter ascentHeading, targetApoapsis.
 
 		local madeSurfaceContact is false.
 		local insufficientDeltaV is false.
@@ -27,11 +30,11 @@
 		lock throttle to 1.
 		until (
 			vesselBounds:bottomAltRadar >= MINIMUM_VERTICAL_CLIMB
-			and eta:apoapsis >= launchApEtaTarget
+			and eta:apoapsis >= VERTICAL_CLIMB_ETA_TARGET
 		) or insufficientDeltaV {
 			if stage:number = 0 and availableThrust = 0 set insufficientDeltaV to true.
 
-			if autostage() set vesselBounds to ship:bounds.
+			autostage().
 
 			wait 0.
 		}
@@ -49,11 +52,11 @@
 			local targetPitch is 0.
 			lock steering to heading(ascentHeading, targetPitch).
 			local etaPid is pidLoop(ETA_KP, ETA_KI, ETA_KD, ETA_MIN_PITCH, ETA_MAX_PITCH, ETA_EPSILON).
-			set etaPid:setpoint to climbApEtaTarget.
+			set etaPid:setpoint to LAUNCH_AP_ETA_TARGET.
 
 			// We could have used max(altitudeSafety,targetApoapsis), but that is down to the caller,
 			// as the targetApoapsis may intentionally be below safe terrain altitude if it's know the trajectory has a lower limit
-			until (apoapsis >= targetApoapsis and etaControl >= etaFinalMargin) or madeSurfaceContact or insufficientDeltaV {
+			until (apoapsis >= targetApoapsis and etaControl >= MINIMUM_AP_LEAD_TIME) or madeSurfaceContact or insufficientDeltaV {
 				if surfaceContact() set madeSurfaceContact to true.
 				if stage:number = 0 and availableThrust = 0 set insufficientDeltaV to true.
 				set targetPitch to etaPid:update(time:seconds, etaControl).

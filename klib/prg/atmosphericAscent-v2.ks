@@ -392,6 +392,10 @@
 			autostage().
 			wait 0.
 		}
+		unlock vPrograde.
+		unlock vRadial.
+		unlock radialPerp.
+		unlock vSteer.
 	}
 
 	function ascentHandoff {
