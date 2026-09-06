@@ -40,10 +40,8 @@ local returnPeriapsis is 35e3.
 		local returnToOrbit is false.
 		on abort set returnToOrbit to true.
 		dmsg("Use ABORT to trigger ascent", true).
-
 		wait until returnToOrbit.
-		dmsg("Ascending in 10 seconds", true).
-		wait 10.
+
 		moonAscent(moonAscentHeading, moonAscentApoapsis).
 	}
 	moonCircularization().
@@ -61,6 +59,7 @@ local returnPeriapsis is 35e3.
 	function kerbinLaunch {
 		parameter launchApoapsis, launchInclination is 0.
 		ascent:executeAscent(launchApoapsis, launchInclination).
+
 		ascent:orbitalInsertion(launchApoapsis).
 		stageUntil(3).
 	}
@@ -182,7 +181,7 @@ local returnPeriapsis is 35e3.
 	}
 
 	function moonDescent {
-		dmsg("Switch to descent guiadance", true).
+		dmsg("Switch to descent guidance", true).
 		descent().
 		clearScreen.
 	}
@@ -245,6 +244,7 @@ local returnPeriapsis is 35e3.
 		warpTo(time:seconds + eta:periapsis - 600).
 		wait until kuniverse:timewarp:issettled.
 
+		toggle ag1. // disable antenna
 		atmosphericDescent().
 	}
 }
