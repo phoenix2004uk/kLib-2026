@@ -2,6 +2,7 @@
 	local SEEK_MAGNITUDE_HIGH is 2.
 	local SEEK_MAGNITUDE_LOW is -2.
 	local DELTA is list(0, 1, -1).
+	local INFINITE_SCORE is 3e30.
 
 	function create_base_data {
 		parameter mnv.
@@ -34,19 +35,18 @@
 
 	function update_maneuver {
 		parameter mnv, base_data, seek_data, magnitude.
-		
+
 		set mnv:eta to base_data[0] + (seek_data[0]*magnitude) - time:seconds.
 		set mnv:radialout to base_data[1] + (seek_data[1]*magnitude).
 		set mnv:normal to base_data[2] + (seek_data[2]*magnitude).
 		set mnv:prograde to base_data[3] + (seek_data[3]*magnitude).
-		return mnv.
 	}.
 
 	function seek_step {
 		parameter mnv, seek_matrix, fitness_function, magnitude.
 
 		local best_index is -1.
-		local best_fitness is 3e30.
+		local best_fitness is INFINITE_SCORE.
 
 		until best_index = 0 {
 			set best_index to 0.

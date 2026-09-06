@@ -22,3 +22,6 @@ porkchop*.html
 porkchop*.png
 porkchop*.svg
 plot_porkchop.py
+
+# old library file versions
+klib/prg/airlessDescent-v1.ks
