@@ -5,14 +5,21 @@
 	function atmosphericDescent {
 		parameter landingStage is 0, descentStage is 1, parachuteAltitude is 10e3, landingAltitude is 1e3.
 
+		wait until altitude < body:atm:height + 20e3.
+		kuniverse:timewarp:cancelwarp().
+		wait until kuniverse:timewarp:issettled.
+
 		dmsg("Waiting for atmospheric re-entry", true).
 		wait until altitude < body:atm:height.
-		lock steering to lookDirUp(srfRetrograde:vector, sun:position).
-		awaitSteering().
+
 		if stage:number > descentStage {
 			dmsg("Discarding descent stage", true).
 			stageUntil(descentStage).
+			wait 1.
 		}
+
+		lock steering to lookDirUp(srfRetrograde:vector, sun:position).
+		awaitSteering().
 
 		wait until alt:radar < parachuteAltitude.
 		dmsg("Staging parachutes", true).

@@ -1,0 +1,1 @@
+{export({local Z is throttle,Y is Z,X is time:seconds. return lex("current",{local W is time:seconds,U is 0.3*(W-X).set X to W. set Y to max(Y-U,min(Y+U,Z)).return Y.},"setTarget",{parameter W. set Z to max(0,min(1,W)).},"target",{return Z.},"reset",{parameter W is throttle. set Z to max(0,min(1,W)).set Y to Z. set X to time:seconds.}).}).}
