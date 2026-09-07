@@ -84,6 +84,8 @@
 		wait until vdot(dV0, mnv:deltav) < 0 or (mnv:deltav:mag < BURN_PRECISION and vdot(dV0, mnv:deltav) < 0.5).
 		lock throttle to 0.
 		unlock steering.
+		unlock max_acceleration.
+		unlock mnv_throttle.
 		wait 0.1.
 		remove mnv.
 	}

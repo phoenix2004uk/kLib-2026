@@ -135,14 +135,6 @@
 			"z", dvDeparture + dvArrival
 		).
 	}
-	function createTransferCandidate {
-		parameter cell, departureUT, arrivalUT, shipState, targetState, transferResult.
-		local candidate is createSearchCandidate(cell, departureUT, arrivalUT, shipState, targetState, transferResult).
-		set candidate["s"] to shipState.
-		set candidate["g"] to targetState.
-		set candidate["f"] to transferResult.
-		return candidate.
-	}
 	function createOrbitSnapshotFromState {
 		parameter targetOrbit, referenceUT, positionVector, velocityVector, transitionUT is false.
 		local targetBody is targetOrbit:body,
@@ -945,19 +937,11 @@
 				departureUT, arrivalUT, tof
 			).
 		}
-		return createTransferCandidate(
-			candidate:c, departureUT, arrivalUT,
-			shipState, targetState, transferResult
-		).
-	}
-	function transferToNodes {
-		parameter candidate.
-		local mnvDeparture is velocityChangeToNode(candidate:d, candidate:s:p, candidate:s:v, candidate:f:departureVelocity),
-			mnvArrival is velocityChangeToNode(candidate:a, candidate:g:p, candidate:f:arrivalVelocity, candidate:g:v).
-		return lex(
-			"departure", mnvDeparture,
-			"arrival", mnvArrival
-		).
+		local transferCandidate is createSearchCandidate(candidate:c, departureUT, arrivalUT, shipState, targetState, transferResult).
+		set transferCandidate["s"] to shipState.
+		set transferCandidate["g"] to targetState.
+		set transferCandidate["f"] to transferResult.
+		return transferCandidate.
 	}
 	function rendezvous {
 		parameter withTarget, atPhaseOffset is 0, options is lex().
@@ -1015,7 +999,13 @@
 		if departureBurnEta < cfg:burnEta {
 			return ApiFail("Transfer departure is too soon; only " + round(departureBurnEta) + " seconds remain").
 		}
-		return ApiOK(transferToNodes(refreshed)).
+		
+		local mnvDeparture is velocityChangeToNode(refreshed:d, refreshed:s:p, refreshed:s:v, refreshed:f:departureVelocity),
+			mnvArrival is velocityChangeToNode(refreshed:a, refreshed:g:p, refreshed:f:arrivalVelocity, refreshed:g:v).
+		return ApiOK(lex(
+			"departure", mnvDeparture,
+			"arrival", mnvArrival
+		)).
 	}
 	export(rendezvous@).
 }

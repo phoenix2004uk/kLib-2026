@@ -1,1 +1,1 @@
-{local z is constant:e. function A{parameter x. return(z^x+z^(-x))/2.}function B{parameter x. return ln(x+sqrt(x^2-1)).}function C{parameter x. return(z^x-z^(-x))/2.}function D{parameter x. return ln(x+sqrt(x^2+1)).}export(lex("cosh",A@,"acosh",B@,"sinh",C@,"asinh",D@)).}
+{local Z is constant:e. export(lex("cosh",{parameter X. return(Z^X+Z^(-X))/2.},"acosh",{parameter X. return ln(X+sqrt(X^2-1)).},"sinh",{parameter X. return(Z^X-Z^(-X))/2.},"asinh",{parameter X. return ln(X+sqrt(X^2+1)).})).}

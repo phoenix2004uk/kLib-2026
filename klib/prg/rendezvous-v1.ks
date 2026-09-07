@@ -10,7 +10,6 @@
 	local PHASE_TIME_BISECTION_ITERATIONS is 40.
 	local LAMBERT_DIRECTIONS is list("short", "long").
 	local LAMBERT_BRANCHES is list("left", "right").
-	local VERBOSE_DEBUG_LOG is false.
 
 	local DEFAULT_CONFIG is lex(
 		// Minimum time that must remain before the final selected departure.
@@ -56,12 +55,6 @@
 		"progressCell", {parameter level, evaluated. print "Level " + level + ": " + evaluated + " evaluated". },
 		"progressChase", {parameter phaseCellSize, maxIterations. print "Chasing final refinement boundary".}
 	).
-
-	function dPrint {
-		parameter message.
-		if homeConnection:isconnected log message to "0:/debug.txt".
-		if VERBOSE_DEBUG_LOG print message.
-	}
 
 	function trueAnomalyOfState {
 		parameter positionVector, eccentricityVector, eccentricity, angularMomentumVector, signed is false.
@@ -925,16 +918,6 @@
 		// Cover the departure phase window exactly.
 		set departurePhaseResolution to departurePhaseWidth / departureCount.
 
-		{
-			// DEBUG
-			dPrint("--------------------------------").
-			dPrint("INITIAL PHASE GRID").
-			dPrint("departure phase min = " + departurePhaseMin).
-			dPrint("departure phase max = " + departurePhaseMax).
-			dPrint("departure phase count = " + departureCount).
-			dPrint("departure phase resolution = " + departurePhaseResolution).
-		}
-
 		from { local departureIndex is 0. }
 		until departureIndex >= departureCount
 		step { set departureIndex to departureIndex + 1. }
@@ -1212,95 +1195,7 @@
 			set best to nextBest.
 		}
 
-		{
-			// DEBUG
-			dPrint("--------------------------------").
-			dPrint("BOUNDARY CHASE").
-			dPrint("phase resolution = " + phaseCellSize).
-			dPrint("maximum distance = " + cfg:chaseDegrees).
-			dPrint("iterations = " + iterations).
-			dPrint("evaluated = " + evaluationState:nextCellId).
-			dPrint("valid = " + (evaluationState:nextCellId - evaluationState:invalid)).
-			dPrint("invalid = " + evaluationState:invalid).
-			dPrint("initial total dV = " + initialCandidate:dvTotal).
-			dPrint("final total dV = " + best:dvTotal).
-			dPrint("total dV improvement = " + (initialCandidate:dvTotal - best:dvTotal)).
-			dPrint(
-				"final departure phase cell = "
-				+ best:cell:departurePhase:min
-				+ " .. "
-				+ best:cell:departurePhase:max
-			).
-			dPrint(
-				"final arrival phase cell = "
-				+ best:cell:arrivalPhase:min
-				+ " .. "
-				+ best:cell:arrivalPhase:max
-			).
-		}
-
 		return best.
-	}
-
-	// Search logging
-	// ----------------------------------------------------------------
-
-	function logEvaluation {
-		parameter evaluation, level, promising.
-
-		dPrint("--------------------------------").
-		dPrint("GRID LEVEL " + level).
-		dPrint("evaluated = " + evaluation:evaluated).
-		dPrint("valid = " + evaluation:valid).
-		dPrint("invalid = " + evaluation:invalid).
-
-		for reason in evaluation:reasons:keys {
-			dPrint("  failure: " + reason + " = " + evaluation:reasons[reason]).
-		}
-
-		local familiesRetained is lex().
-		for candidate in promising {
-			local candidateFamily is familyKey(candidate).
-
-			if not familiesRetained:haskey(candidateFamily) {
-				familiesRetained:add(candidateFamily, 0).
-			}
-			set familiesRetained[candidateFamily]
-				to familiesRetained[candidateFamily] + 1.
-		}
-
-		dPrint("Retention Families:").
-		for candidateFamily in familiesRetained:keys {
-			dPrint("  " + candidateFamily + " = " + familiesRetained[candidateFamily]).
-		}
-
-		if promising:length > 0 {
-			// Global retained candidates are sorted, so the first is the level best.
-			local levelBest is promising[0].
-
-			dPrint("best depart = " + levelBest:departureUT).
-			dPrint("best arrival = " + levelBest:arrivalUT).
-			dPrint("best tof = " + levelBest:tof).
-			dPrint("best departure dV = " + levelBest:dvDeparture).
-			dPrint("best arrival dV = " + levelBest:dvArrival).
-			dPrint("best total dV = " + levelBest:dvTotal).
-			dPrint("best revolutions = " + levelBest:cell:revolutions).
-			dPrint("best direction = " + levelBest:cell:direction).
-			dPrint("best branch = " + levelBest:cell:branch).
-			dPrint("retained cells = " + promising:length).
-			dPrint(
-				"best departure phase cell = "
-				+ levelBest:cell:departurePhase:min
-				+ " .. "
-				+ levelBest:cell:departurePhase:max
-			).
-			dPrint(
-				"best arrival phase cell = "
-				+ levelBest:cell:arrivalPhase:min
-				+ " .. "
-				+ levelBest:cell:arrivalPhase:max
-			).
-		}
 	}
 
 	// Adaptive search
@@ -1324,7 +1219,6 @@
 		).
 		local promising is evaluation:promising.
 
-		logEvaluation(evaluation, 0, promising).
 		if promising:length = 0 return false.
 
 		local best is promising[0].
@@ -1349,7 +1243,6 @@
 			).
 			set promising to evaluation:promising.
 
-			logEvaluation(evaluation, level, promising).
 			if promising:length = 0 break.
 
 			if promising[0]:dvTotal < best:dvTotal set best to promising[0].
@@ -1462,24 +1355,6 @@
 			candidate:targetState:velocity
 		).
 
-		{
-			// DEBUG
-			dPrint("================================").
-			dPrint("FINAL TRANSFER").
-			dPrint("departure UT = " + candidate:departureUT).
-			dPrint("arrival UT = " + candidate:arrivalUT).
-			dPrint("tof = " + candidate:tof).
-			dPrint("departure dV = " + candidate:dvDeparture).
-			dPrint("arrival dV = " + candidate:dvArrival).
-			dPrint("total dV = " + candidate:dvTotal).
-			dPrint("departure radial = " + mnvDeparture:radialout).
-			dPrint("departure normal = " + mnvDeparture:normal).
-			dPrint("departure prograde = " + mnvDeparture:prograde).
-			dPrint("arrival radial = " + mnvArrival:radialout).
-			dPrint("arrival normal = " + mnvArrival:normal).
-			dPrint("arrival prograde = " + mnvArrival:prograde).
-		}
-
 		return lex(
 			"departure", mnvDeparture,
 			"arrival", mnvArrival
@@ -1533,54 +1408,6 @@
 			"max", body:soiradius - cfg:soiClearance
 		).
 
-		{
-			// DEBUG
-			dPrint("================================").
-			dPrint("RENDEZVOUS SEARCH").
-			dPrint("================================").
-			dPrint("UT now = " + referenceUT).
-			dPrint("ship = " + ship:name).
-			dPrint("target = " + withTarget:tostring).
-			dPrint("target reference UT = " + targetSnapshot:referenceUT).
-			dPrint("target phase offset = " + atPhaseOffset).
-			dPrint("body = " + body:name).
-			dPrint("ship a = " + shipSnapshot:semimajorAxis).
-			dPrint("ship e = " + shipSnapshot:eccentricity).
-			dPrint("ship V0 = " + shipSnapshot:trueAnomaly).
-			dPrint("target a = " + targetSnapshot:semimajorAxis).
-			dPrint("target e = " + targetSnapshot:eccentricity).
-			dPrint("target V0 = " + targetSnapshot:trueAnomaly).
-
-			dPrint("--------------------------------").
-			dPrint("SEARCH CONFIGURATION").
-			dPrint("minimum departure burn eta = " + cfg:burnEta).
-			dPrint("minimum departure search offset = " + cfg:depOffset).
-			dPrint("minimum departure search period factor = " + cfg:depPeriodFactor).
-			dPrint("minimum patch transition margin = " + cfg:patchMargin).
-			dPrint("maximum orbit count = " + cfg:depOrbits).
-			dPrint("minimum tof = " + cfg:tofMin).
-			dPrint("minimum tof factor = " + cfg:tofMinFactor).
-			dPrint("tof window factor = " + cfg:tofWindowFactor).
-			dPrint("maximum revolutions = " + cfg:maxRevs).
-			dPrint("phase cell sizes = " + cfg:phaseSizes:join(", ")).
-			dPrint("maximum initial phase samples/dimension = " + cfg:phaseSamples).
-			dPrint("retention limit = " + cfg:retainMax).
-			dPrint("retention fraction = " + cfg:retainFraction).
-			dPrint("retention per Lambert family = " + cfg:retainFamily).
-			dPrint("minimum periapsis clearance = " + cfg:peClearance).
-			dPrint("minimum soi radius clearance = " + cfg:soiClearance).
-			dPrint("output porkchop log = " + cfg:porkchop).
-			dPrint("stream progress interval = " + cfg:progressEvery).
-			dPrint("maximum boundary chase degrees = " + cfg:chaseDegrees).
-
-			dPrint("--------------------------------").
-			dPrint("SEARCH WINDOWS").
-			dPrint("departure min = " + departureWindow:min).
-			dPrint("departure max = " + departureWindow:max).
-			dPrint("tof min = " + tofWindow:min).
-			dPrint("tof max = " + tofWindow:max).
-		}
-
 		local oldIpu is config:ipu.
 		set config:ipu to 2000.
 
@@ -1597,16 +1424,6 @@
 
 		if best:istype("Boolean") return ApiFail("No valid transfer was found").
 
-		{
-			// DEBUG
-			dPrint("================================").
-			dPrint("REFRESHING FINAL TRANSFER").
-			dPrint("search finished UT = " + time:seconds).
-			dPrint("original departure dV = " + best:dvDeparture).
-			dPrint("original arrival dV = " + best:dvArrival).
-			dPrint("original total dV = " + best:dvTotal).
-		}
-
 		local refreshed is refreshTransfer(
 			best,
 			targetSnapshot,
@@ -1618,21 +1435,8 @@
 		}
 
 		local departureBurnEta is refreshed:departureUT - time:seconds.
-		{
-			// DEBUG
-			dPrint("departure burn eta = " + departureBurnEta).
-		}
 		if departureBurnEta < cfg:burnEta {
 			return ApiFail("Transfer departure is too soon; only " + round(departureBurnEta) + " seconds remain").
-		}
-		{
-			// DEBUG
-			dPrint("refreshed departure dV = " + refreshed:dvDeparture).
-			dPrint("refreshed arrival dV = " + refreshed:dvArrival).
-			dPrint("refreshed total dV = " + refreshed:dvTotal).
-			dPrint("departure dV change = " + (refreshed:dvDeparture - best:dvDeparture)).
-			dPrint("arrival dV change = " + (refreshed:dvArrival - best:dvArrival)).
-			dPrint("total dV change = " + (refreshed:dvTotal - best:dvTotal)).
 		}
 
 		return ApiOK(transferToNodes(refreshed)).
