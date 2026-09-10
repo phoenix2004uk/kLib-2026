@@ -1,0 +1,1 @@
+{local A is import("mech/orbitalMechanics-v1"),B is{parameter Z,Y,X. return ApiOK(node(time:seconds+X,0,0,A:v(Y,(Z+Y)/2+body:radius)-A:v(Y))).}.export(lex("Ap",{parameter Z. return B(Z,periapsis,eta:periapsis).},"Pe",{parameter Z. if apoapsis<0 return ApiFail("There is no apoapsis on an open orbit").return B(Z,apoapsis,eta:apoapsis).})).}
