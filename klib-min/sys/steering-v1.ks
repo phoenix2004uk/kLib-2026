@@ -1,1 +1,1 @@
-{function A{return vang(ship:facing:vector,steeringManager:target:vector)<.25.}export(lex("awaitSteering",{wait 0.wait until A().},"isSettled",A@)).}
+{function A{return abs(steeringManager:angleError)<.25 and abs(steeringManager:rollError)<.25.}export(lex("awaitSteering",{wait 0.wait until A().},"isSettled",A@)).}

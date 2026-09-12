@@ -9,12 +9,12 @@
 
 		local targetOrbit is targetOrbitable:orbit.
 
-		local targetAltitudeEstimate is targetOrbit:semimajoraxis - body:radius.
-		local shipAltitudeEstimate is obt:semimajoraxis - body:radius.
+		local targetRadiusEstimate is targetOrbit:semimajoraxis.
+		local shipRadiusEstimate is obt:semimajoraxis.
 
 		local targetAngularSpeed is 360 / targetOrbit:period.
 		local shipAngularSpeed is 360 / obt:period.
-		local transferPeriod is OrbitalMechanics:P((targetAltitudeEstimate + shipAltitudeEstimate) / 2).
+		local transferPeriod is OrbitalMechanics:P((targetRadiusEstimate + shipRadiusEstimate) / 2).
 		local transferHalfPeriod is transferPeriod / 2.
 		local targetAngularMovement is targetAngularSpeed * transferHalfPeriod.
 		local relativeAngularSpeed is abs(shipAngularSpeed - targetAngularSpeed).
@@ -30,11 +30,11 @@
 		local phaseAngle is mod(targetAngularPosition + 360 - shipAngularPosition, 360).
 		local transferAngle is mod(180 - targetAngularMovement, 360).
 
-		if targetAltitudeEstimate < shipAltitudeEstimate {
+		if targetRadiusEstimate < shipRadiusEstimate {
 			set phaseAngle to phaseAngle - 360.
 			if phaseAngle > transferAngle set phaseAngle to phaseAngle - 360.
 		}
-		if targetAltitudeEstimate > shipAltitudeEstimate and phaseAngle < transferAngle {
+		if targetRadiusEstimate > shipRadiusEstimate and phaseAngle < transferAngle {
 			set phaseAngle to phaseAngle + 360.
 		}
 
