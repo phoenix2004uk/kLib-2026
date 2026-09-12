@@ -228,11 +228,11 @@
 		for entry in approachProfile {
 			approachDockingRange(sourcePort, targetPort, entry[0], entry[1], trackCorridor).
 
-			if not trackCorridor and not steeringControl:isSettled() {
+			if not trackCorridor and not steeringControl:isSettled(true) {
 				notify("Awaiting docking port alignment").
 				dmsg("[Dock] Awaiting docking port alignment to complete", true).
 				rcsControl:zero(targetPort:ship).
-				steeringControl:awaitSteering().
+				steeringControl:awaitSteering(true).
 			}
 
 			set trackCorridor to true.

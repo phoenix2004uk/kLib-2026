@@ -78,10 +78,12 @@
 
 		until targetVessel:distance <= targetSeparation {
 			approachTarget(targetVessel, approachSpeed).
+			lock steering to getApproachVector(targetVessel, 0).
 
 			wait until targetVessel:distance <= targetSeparation or closestApproach(targetVessel).
 
 			matchVelocity(targetVessel).
+			lock steering to getApproachVector(targetVessel, approachSpeed).
 			wait 0.
 		}
 	}
