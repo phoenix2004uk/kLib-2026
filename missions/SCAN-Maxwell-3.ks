@@ -372,7 +372,7 @@ function deorbit {
 	lock steering to retrograde.
 	awaitSteering().
 	lock throttle to 1.
-	wait until periapsis < -10e3 or ship:thrust = 0.
+	wait until periapsis < -10e3.
 	lock throttle to 0.
 
 	notify("De-orbit burn complete - brace for impact").

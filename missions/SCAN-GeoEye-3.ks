@@ -26,6 +26,23 @@ clearScreen.
 kuniverse:timewarp:cancelwarp().
 wait until kuniverse:timewarp:issettled.
 
+// Steering Manager tuning
+set steeringManager:maxStoppingTime to 1.
+set steeringManager:pitchPid:kp to 1.5.
+set steeringManager:pitchPid:ki to 0.
+set steeringManager:pitchPid:kd to 0.05.
+set steeringManager:pitchTs to 1.
+set steeringManager:yawPid:kp to 1.5.
+set steeringManager:yawPid:ki to 0.
+set steeringManager:yawPid:kd to 0.05.
+set steeringManager:yawTs to 1.
+set steeringManager:rollControlAngleRange to 5.
+set steeringManager:rollPid:kp to 2.
+set steeringManager:rollPid:ki to 0.
+set steeringManager:rollPid:kd to 0.
+set steeringManager:rollTs to 0.7.
+steeringManager:resetPids().
+
 // Mission State
 local StatePath is "1:/step.json".
 function SaveState {
@@ -40,18 +57,18 @@ function LoadState {
 local currentState is LoadState().
 
 // Mission Configuration
-//	body: Mun
+//	body: Minmus
 //	eccentricity: < 0.0021
-//	inclination: 84.9 - 85.5
-//	altitude: 250km max
+//	inclination: 76.8 - 77.1
+//	altitude: 150km max
 // Start scan with AG1
-local targetBody is Mun.
+local targetBody is Minmus.
 local launchApoapsis is 100e3.
 local launchInclination is 0.
-local minApoapsis is 249e3.
-local maxApoapsis is 250e3.
-local minInclination is 84.9.
-local maxInclination is 85.5.
+local minApoapsis is 149e3.
+local maxApoapsis is 150e3.
+local minInclination is 76.8.
+local maxInclination is 77.1.
 local maxEccentricity is 0.0021.
 
 // Mission Overview
@@ -169,7 +186,6 @@ function circularization {
 	add circularizeResult:val.
 	if steeringSettled() warpToNode(60).
 	notify("Executing " + body:name + " circularization").
-	warpToNode(60).
 	executeNode(60).
 	rcs off.
 }
