@@ -170,10 +170,16 @@
 
 	export(lex(
 		"v", OrbitalSpeed@,
-		"vh", { parameter h, h1, h2, b is body. return OrbitalSpeed(h, OrbitalParameters:a(h1, h2, b), b). },
+		"vh", {
+			parameter h, h1, h2, b is body.
+			return OrbitalSpeed(h, OrbitalParameters:a(h1, h2, b), b).
+		},
 		"Ve", EscapeVelocity@,
 		"P", OrbitalPeriod@,
-		"Ph", { parameter h1, h2, b is body. return OrbitalPeriod(OrbitalParameters:a(h1, h2, b), b). },
+		"Ph", {
+			parameter h1, h2, b is body.
+			return OrbitalPeriod(OrbitalParameters:a(h1, h2, b), b).
+		},
 		"h", SpecificOrbitalAngularMomentum@,
 		"hAt", SpecificOrbitalAngularMomentumAt@,
 		"etaV", TrueAnomalyEta@,

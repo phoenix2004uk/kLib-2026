@@ -42,12 +42,14 @@
 		local targetRadius is(targetBounds:abscenter-targetVessel:position):mag+targetBounds:size:mag/2.
 		local shipRadius is shipBounds:abscenter:mag+shipBounds:size:mag/2.
 		local routingRadius is (targetRadius+shipRadius+10)*sqrt(2).
+		local approachProfile is list(list(routingRadius,cfg:routeSpeed)).
+		local holdFacing is facing.
+		local noSideswipe is false.
+		local trackCorridor is false.
 		dmsg("[Dock] Projecting a "+round(routingRadius,1)+"m routing sphere",true).
 		dmsg("[Dock]   target = "+round(targetRadius,1)+"m",true).
 		dmsg("[Dock]   ship   = "+round(shipRadius,1)+"m",true).
-		local approachProfile is list(list(routingRadius,cfg:routeSpeed)).
 		for entry in cfg:dockApproach if entry[0]<routingRadius approachProfile:add(entry).
-		local holdFacing is ship:facing.
 		lock steering to holdFacing.
 		sas off.
 		rcs on.
@@ -66,13 +68,12 @@
 		dmsg("[Dock] Align for docking",true).
 		local lock approachAxis to-targetPort:portFacing:vector.
 		lock steering to lookDirUp(approachAxis,angleAxis(-cfg:rollOffset,approachAxis)*targetPort:portFacing:upvector).
-		local noSideswipe is false.
 		until noSideswipe{
 			wait 0.
 			set noSideswipe to true.
 			local startVector is-targetPort:ship:position.
 			local destinationVector is calculateCorridorOffset(targetPort,routingRadius).
-			if vdot(startVector,destinationVector)<startVector:mag*destinationVector:mag*cos(90){
+			if startVector*destinationVector<startVector:mag*destinationVector:mag*cos(90){
 				notify("Routing around target").
 				dmsg("[Dock] Sideswipe target by "+90+"° at "+round(cfg:routeSpeed,1)+"m/s",true).
 				set noSideswipe to false.
@@ -83,7 +84,7 @@
 				}
 				local sideVector is(angleAxis(-90,routeNormal)*startVector):normalized*routingRadius.
 				local otherSideVector is(angleAxis(90,routeNormal)*startVector):normalized*routingRadius.
-				if vdot(otherSideVector,destinationVector)>vdot(sideVector,destinationVector)set sideVector to otherSideVector.
+				if otherSideVector*destinationVector > sideVector*destinationVector set sideVector to otherSideVector.
 				local lock sidePosition to targetPort:ship:position+sideVector.
 				local lock sideVelocity to sidePosition:normalized*min(cfg:routeSpeed,sidePosition:mag/2)-velocity:orbit+targetPort:ship:velocity:orbit.
 				until sidePosition:mag<.25{
@@ -92,7 +93,6 @@
 				}
 			}
 		}
-		local trackCorridor is false.
 		for entry in approachProfile{
 			approachDockingRange(sourcePort,targetPort,entry[0],entry[1],trackCorridor).
 			if not trackCorridor and not steeringControl:isSettled(true){

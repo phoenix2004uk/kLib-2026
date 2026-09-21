@@ -297,8 +297,8 @@
 		).
 		set pidApHold:setpoint to apTarget.
 
-		smoothThrottle:reset(THROTTLE_MIN).
 		local wantedThrottle is THROTTLE_MIN.
+		smoothThrottle:reset(THROTTLE_MIN).
 		lock throttle to smoothThrottle:current().
 
 		until altitude >= body:atm:height {
@@ -386,9 +386,9 @@
 				peTarget,
 				pitchOffset
 			).
+			set pitchOffset to pidPitch:update(time:seconds, apoapsis).
 			set insertionThrottle to pidThrottle:update(time:seconds, eta:apoapsis).
 			smoothThrottle:setTarget(insertionThrottle).
-			set pitchOffset to pidPitch:update(time:seconds, apoapsis).
 			autostage().
 			wait 0.
 		}
@@ -437,18 +437,15 @@
 			etaMin is INSERTION_ETA_MIN,
 			peTarget is INSERTION_PE_TARGET.
 
-		if insertionComplete(apTarget, apMaxError, etaMin, peTarget) {
-			ascentHandoff().
-			return.
+		if not insertionComplete(apTarget, apMaxError, etaMin, peTarget) {
+			performOrbitalInsertion(
+				apTarget,
+				apMaxError,
+				etaTarget,
+				etaMin,
+				peTarget
+			).
 		}
-
-		performOrbitalInsertion(
-			apTarget,
-			apMaxError,
-			etaTarget,
-			etaMin,
-			peTarget
-		).
 		ascentHandoff().
 	}
 

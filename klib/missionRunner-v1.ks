@@ -1,12 +1,12 @@
 // ============================================================================
 // Mission Runner v1
-// Persistent sequential mission executor with polled events and named commands.
+// Persistent sequential mission executor with polled events, named commands and a persistent data bus.
 //
 // Steps execute sequentially and are generally non-blocking: Each step handler is repeatedly called until it uses `next()` or `end()` from the provided interface to advance/end the mission.
 // Enabled events are run after each time a step handler is called, regardless if that step uses `next()`.
 // Event state changes (enable / disable) apply on the next event-loop.
 // Steps can use blocking loops or scripts, and the `tick()` function is provided to optionally run the event-loop without yielding back to the mission runner.
-// Mission progress and non-default event states (enabled/disabled) persist across KPU restarts.
+// Mission progress, non-default event states (enabled/disabled) and shared data bus values persist across KPU restarts.
 //
 // Persistent state does support updated mission scripts, as the mission runner state will restore the same *numerical* step/next positions.
 // This allows current/future steps to be added/moved/removed, but inserting/removing earlier steps can cause desyncronization of mission progress so Kare* must be taken.
@@ -40,9 +40,9 @@
 //   Note: Step/Event/Command names must be unique within their own type, and may contain only alphanumeric characters, underscores or hyphens. "Ended" and "Starting" are reserved step names.
 // ============================================================================
 // Handler interfaces:
-//   Step interface - passed to every step handler and contains: next(), end(), enable(name), disable(name), current(), invoke(name), tick()
-//   Event interface - passed to every event handler and contains: enable(name), disable(name), current(), invoke(name)
-//   Command interface - passed to every command handler and contains: enable(name), disable(name), current(), invoke(name)
+//   Step interface - passed to every step handler and contains: next(), end(), enable(name), disable(name), current(), invoke(name), tick(), share(tag, data), fetch(tag)
+//   Event interface - passed to every event handler and contains: enable(name), disable(name), current(), invoke(name), fetch(tag)
+//   Command interface - passed to every command handler and contains: enable(name), disable(name), current(), invoke(name), fetch(tag)
 // Interface functions:
 //   next()					Advance the mission to the next mission step in sequence.
 //   end()					End the mission by advancing to the end of the mission sequence. The event-loop is allowed to run a final time.
@@ -51,12 +51,19 @@
 //   current()				Returns the name of the current step. "Starting/<name>" is returned if the mission loop has not started, and "Ended" is returned if the mission has ended (or there are no steps).
 //   invoke(name)			Invoke the named command.
 //   tick()					Invoke the mission event-loop immediately without yielding control back to the mission runner. The event-loop will still run once the step handler yields control back to the mission runner.
+//   share(tag, data)		Share a String, Scalar or Boolean value onto the persistent mission data bus.
+//   fetch(tag)				Fetch a shared value from the mission data bus, returning an empty string if the tag does not exist.
 //							* Enabling or disabling events will take effect for the following event-loop.
 // ============================================================================
 {
-	// TODO: later enhancement could allow nested mission runners, at which point the state filename must become dynamic from the runner, with only the root runner being a static filename
+	// TODO: later enhancement could allow nested mission runners.
+	//       At which point the state filename must become dynamic from the runner, with only the root runner being a static filename.
+	//       The data bus path would either have to become dynamic, or add a local (dynamic sub-path) and global (static path) data bus.
 	local STATE_FILE is "1:/state.run".
-	local STATE_TMP is "1:/state.tmp".
+	local DATA_BUS_PATH is "1:/data/missionRunner/".
+	local TMP_PATH is "1:/tmp/missionRunner/".
+	local STATE_TMP is TMP_PATH + "state".
+	local DATA_BUS_TMP is TMP_PATH + "data/".
 	local STARTING_STEP is "Starting".
 	local ENDED_STEP is "Ended".
 
@@ -80,13 +87,13 @@
 	function _SetEventState {
 		parameter runnerState, eventName, enabled.
 
-		if not runnerState:events:haskey(eventName) return false.
+		if not runnerState:events:hasKey(eventName) return false.
 		set runnerState:events[eventName]:enabled to enabled.
 		return true.
 	}
 
 	function _ClearTempState {
-		if exists(STATE_TMP) deletePath(STATE_TMP).
+		if exists(TMP_PATH) deletePath(TMP_PATH).
 	}
 	// state will be conservatively saved in the form: currentStep,nextStep,eventName,eventName,...
 	// where events are stored if their enabled state is not their default state
@@ -107,8 +114,8 @@
 		local stateData is stateList:join(",").
 
 		_ClearTempState().
-		local hFile is create(STATE_TMP).
-		if volume(1):freespace < stateData:length or not hFile:write(stateData) {
+		local hStateFile is create(STATE_TMP).
+		if volume(1):freespace < stateData:length or not hStateFile:write(stateData) {
 			dmsg("[MissionRunner] WARNING! Insufficient volume space or write error! Mission state is not saved!", true).
 		}
 		else {
@@ -131,17 +138,15 @@
 		}
 
 		// check that current/next step are numbers
-		set runnerState:currentStep to stateList[0]:toscalar(-1).
-		set runnerState:nextStep to stateList[1]:toscalar(-1).
-		if runnerState:currentStep = -1 or runnerState:nextStep = -1 {
-			set runnerState:currentStep to -1.
-			set runnerState:nextStep to -1.
+		set runnerState:currentStep to stateList[0]:toScalar(-1).
+		set runnerState:nextStep to stateList[1]:toScalar(-1).
+		if runnerState:currentStep <> stateList[0]:toScalar(0) or runnerState:nextStep <> stateList[1]:toScalar(0) {
 			runnerState:errors:add("Failed to load current/next step from saved state").
 		}
 
 		local events is runnerState:events.
 		for eventName in stateList:sublist(2, stateList:length - 2) {
-			if events:haskey(eventName) {
+			if events:hasKey(eventName) {
 				_SetEventState(runnerState, eventName, not events[eventName]:default).
 			}
 			else {
@@ -149,15 +154,74 @@
 			}
 		}
 	}
+	function _SaveBusEntry {
+		parameter tag, data.
 
+		local type is "S".
+		if data:isType("Boolean") {
+			set type to "B".
+			set data to choose 1 if data else 0.
+		}
+		else if data:isType("Scalar") {
+			set type to "N".
+		}
+
+		local busData is type + data:toString.
+		_ClearTempState().
+		local hBusFile is create(DATA_BUS_TMP + tag).
+		if volume(1):freespace < busData:length or not hBusFile:write(busData) {
+			dmsg("[MissionRunner] WARNING! Insufficient volume space or write error! Data bus tag '" + tag + "' is not saved!", true).
+		}
+		else {
+			movePath(DATA_BUS_TMP + tag, DATA_BUS_PATH + tag).
+		}
+		_ClearTempState().
+	}
+	function _LoadDataBus {
+		parameter runnerState.
+
+		if not exists(DATA_BUS_PATH) return.
+
+		local bus is lex().
+
+		local hDataBus is open(DATA_BUS_PATH).
+		for tag in hDataBus:lex:keys {
+			local hFile is hDataBus:lex[tag].
+			local fileContent is hFile:readall:string.
+			local type is fileContent[0].
+			local data is fileContent:remove(0,1).
+			local valid is true.
+			local parsedData is data.
+			if type = "B" {
+				if data = "1" set parsedData to true.
+				else if data = "0" set parsedData to false.
+				else set valid to false.
+			} else if type = "N" {
+				set parsedData to data:toScalar(0).
+				set valid to parsedData = data:toScalar(1).
+			} else if type <> "S" {
+				set valid to false.
+			}
+			if valid {
+				bus:add(tag, parsedData).
+			}
+			else {
+				runnerState:errors:add("Failed to parse tag '" + tag + "' as type '" + type + "': " + data).
+			}
+		}
+
+		set runnerState:bus to bus.
+	}
 	function _InvalidKeyName {
 		parameter name.
 		return not name:matchesPattern("^[\w-]+$").
 	}
+
 	function instanceStart {
 		parameter runnerState, runnerInterface, eventInterface.
 
 		_LoadState(runnerState).
+		_LoadDataBus(runnerState).
 
 		local errors is runnerState:errors.
 		if errors:length > 0 {
@@ -220,7 +284,7 @@
 	}
 	function _EventNameExists {
 		parameter events, eventName.
-		return events:haskey(eventName).
+		return events:hasKey(eventName).
 	}
 	function instanceAddEvents {
 		parameter runnerState, runnerInstance, newEvents.
@@ -248,7 +312,7 @@
 	}
 	function _CommandNameExists {
 		parameter commands, commandName.
-		return commands:haskey(commandName).
+		return commands:hasKey(commandName).
 	}
 	function instanceAddCommands {
 		parameter runnerState, runnerInstance, newCommands.
@@ -319,10 +383,39 @@
 
 		return STARTING_STEP + "/" + currentStep:name.
 	}
+	function interfaceBusShare {
+		parameter runnerState, tag, data.
+
+		if not (data:isType("String") or data:isType("Scalar") or data:isType("Boolean")) {
+			return ApiFail("Mission runner bus does not support data type: " + data:typename).
+		}
+
+		if _InvalidKeyName(tag) {
+			return ApiFail("Mission runner bus tag '" + tag + "' has invalid characters").
+		}
+
+		if runnerState:bus:hasKey(tag) {
+			set runnerState:bus[tag] to data.
+		}
+		else {
+			runnerState:bus:add(tag, data).
+		}
+		_SaveBusEntry(tag, data).
+
+		return ApiOK().
+	}
+	function interfaceBusFetch {
+		parameter runnerState, tag.
+
+		if runnerState:bus:hasKey(tag) {
+			return runnerState:bus[tag].
+		}
+		return "". // we'll use empty string, since null does not exist in kerboscript
+	}
 	function interfaceInvokeCommand {
 		parameter runnerState, commandInterface, commandName.
 		
-		if not runnerState:commands:haskey(commandName) return ApiFail("Command not found: " + commandName).
+		if not runnerState:commands:hasKey(commandName) return ApiFail("Command not found: " + commandName).
 
 		local command is runnerState:commands[commandName].
 		return ApiOK(command(commandInterface)).
@@ -345,7 +438,8 @@
 			"currentStep", 0,
 			"nextStep", 1,
 			"errors", list(),
-			"started", false
+			"started", false,
+			"bus", lex()
 		).
 
 		// This `runnerInterface` is passed as the first parameter to every step, with `eventInterface` and `commandInterface` for every event and command respectively
@@ -354,12 +448,15 @@
 			"end", interfaceTerminate@:bind(runnerState), // end the mission
 			"disable", interfaceDisableEvent@:bind(runnerState), // disable an event in the main loop
 			"enable", interfaceEnableEvent@:bind(runnerState), // enable an event in the main loop
-			"current", interfaceCurrentStepName@:bind(runnerState) // returns the name of the current step
+			"current", interfaceCurrentStepName@:bind(runnerState), // returns the name of the current step
+			"share", interfaceBusShare@:bind(runnerState), // share some data onto the mission runner data bus
+			"fetch", interfaceBusFetch@:bind(runnerState) // fetch some shared data from the mission runner data bus
 		).
 		local eventInterface is lex(
 			"enable", runnerInterface:enable,
 			"disable", runnerInterface:disable,
-			"current", runnerInterface:current
+			"current", runnerInterface:current,
+			"fetch", runnerInterface:fetch
 		).
 		local commandInterface is eventInterface. // place-holder if we want to separate the event and command interfaces; this would be normalized/minified out
 

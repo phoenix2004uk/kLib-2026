@@ -65,8 +65,9 @@
 
 		if not hasnode return.
 		local mnv is nextnode.
+		local dV0 is mnv:deltav.
 
-		local halfBurnDuration is burnDuration(mnv:deltav:mag/2).
+		local halfBurnDuration is burnDuration(dV0:mag/2).
 		local leadDuration is halfBurnDuration + leadTime.
 		wait until mnv:eta <= leadDuration.
 		kuniverse:timewarp:cancelwarp().
@@ -75,7 +76,6 @@
 		lock steering to mnv:burnvector.
 		awaitSteering().
 
-		local dV0 is mnv:deltav.
 		local lock max_acceleration to ship:availablethrust / ship:mass.
 		local lock mnv_throttle to max(BURN_THRUST_MIN, min(mnv:deltav:mag / max_acceleration, 1)).
 

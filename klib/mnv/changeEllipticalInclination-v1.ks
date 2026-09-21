@@ -14,14 +14,12 @@
 			return ApiFail("Change inclination is not supported on an open orbit: e="+round(obt:eccentricity, 4)).
 		}
 
+		local futureShipRaw is positionAt(ship, utNode).
+		local shipVelocityAtNode is velocityAt(ship, utNode):orbit.
 		local theta is targetInclination - obt:inclination.
-
 		if isDN {
 			set theta to -theta.
 		}
-
-		local futureShipRaw is positionAt(ship, utNode).
-		local shipVelocityAtNode is velocityAt(ship, utNode):orbit.
 
 		local vecRadial is (futureShipRaw - body:position):normalized.
 		local rotatedVelocityVector is angleAxis(-theta, vecRadial) * shipVelocityAtNode.

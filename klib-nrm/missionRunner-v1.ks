@@ -1,9 +1,10 @@
 {
 	local STATE_FILE is "1:/state.run".
-	local STATE_TMP is "1:/state.tmp".
+	local DATA_BUS_PATH is "1:/data/missionRunner/".
+	local TMP_PATH is "1:/tmp/missionRunner/".
 	local _IsRunnerFinished is{
 		parameter runnerState.
-		return runnerState:steps:length=0 or runnerState:currentStep>=runnerState:steps:length.
+		return runnerState:steps:length=0or runnerState:currentStep>=runnerState:steps:length.
 	}.
 	local _ExecuteEventLoop is{
 		parameter runnerState,eventInterface.
@@ -11,11 +12,8 @@
 		for event in runnerState:events:values if event:enabled enabled:add(event).
 		for event in enabled event:invoke(eventInterface).
 	}.
-	local _SetEventState is{
-		parameter runnerState,eventName,enabled.
-		if not runnerState:events:haskey(eventName)return false.
-		set runnerState:events[eventName]:enabled to enabled.
-		return true.
+	local _ClearTempState is{
+		if exists(TMP_PATH)deletePath(TMP_PATH).
 	}.
 	local _SaveState is{
 		parameter runnerState.
@@ -23,11 +21,11 @@
 		local events is runnerState:events.
 		for eventName in events:keys if events[eventName]:enabled<>events[eventName]:default stateList:add(eventName).
 		local stateData is stateList:join(",").
-		if exists(STATE_TMP)deletePath(STATE_TMP).
-		local hFile is create(STATE_TMP).
-		if volume(1):freespace<stateData:length or not hFile:write(stateData)dmsg("[MissionRunner] WARNING! Insufficient volume space or write error! Mission state is not saved!",true).
-		else movePath(STATE_TMP,STATE_FILE).
-		if exists(STATE_TMP)deletePath(STATE_TMP).
+		_ClearTempState().
+		local hStateFile is create(TMP_PATH+"state").
+		if volume(1):freespace<stateData:length or not hStateFile:write(stateData)dmsg("[MissionRunner] WARNING! Insufficient volume space or write error! Mission state is not saved!",true).
+		else movePath(TMP_PATH+"state",STATE_FILE).
+		_ClearTempState().
 	}.
 	local _InvalidKeyName is{
 		parameter name.
@@ -40,7 +38,16 @@
 	}.
 	export(lex("create",{
 		parameter constructorSteps is list().
-		local runnerState is lex("steps",list(),"events",lex(),"commands",lex(),"currentStep",0,"nextStep",1,"errors",list(),"started",false).
+		local runnerState is lex("steps",list(),"events",lex(),"commands",lex(),"currentStep",0,"nextStep",1,"errors",list(),"started",false,"bus",lex()).
+		local interfaceToggleEvent is{
+			parameter enabled,eventName.
+			if runnerState:events:hasKey(eventName){
+				set runnerState:events[eventName]:enabled to enabled.
+				_SaveState(runnerState).
+				return ApiOK().
+			}
+			return ApiFail("Event not found: "+eventName).
+		}.
 		local runnerInterface is lex(
 			"next",{
 				set runnerState:currentStep to runnerState:nextStep.
@@ -52,44 +59,54 @@
 				set runnerState:nextStep to runnerState:steps:length+1.
 				_SaveState(runnerState).
 			},
-			"disable",{
-				parameter eventName.
-				if _SetEventState(runnerState,eventName,false){
-					_SaveState(runnerState).
-					return ApiOK().
-				}
-				return ApiFail("Event not found: "+eventName).
-			},
-			"enable",{
-				parameter eventName.
-				if _SetEventState(runnerState,eventName,true){
-					_SaveState(runnerState).
-					return ApiOK().
-				}
-				return ApiFail("Event not found: "+eventName).
-			},
+			"disable",interfaceToggleEvent:bind(false),
+			"enable",interfaceToggleEvent:bind(true),
 			"current",{
 				if _IsRunnerFinished(runnerState)return "Ended".
-				local currentStep is runnerState:steps[runnerState:currentStep].
-				if runnerState:started return currentStep:name.
-				return "Starting/"+currentStep:name.
+				if runnerState:started return runnerState:steps[runnerState:currentStep]:name.
+				return "Starting/"+runnerState:steps[runnerState:currentStep]:name.
+			},
+			"share",{
+				parameter tag,data.
+				if not(data:isType("String")or data:isType("Scalar")or data:isType("Boolean"))return ApiFail("Mission runner bus does not support data type: "+data:typename).
+				if _InvalidKeyName(tag)return ApiFail("Mission runner bus tag '"+tag+"' has invalid characters").
+				if runnerState:bus:hasKey(tag)set runnerState:bus[tag]to data.
+				else runnerState:bus:add(tag,data).
+				local type is"S".
+				if data:isType("Boolean"){
+					set type to"B".
+					set data to choose 1if data else 0.
+				}
+				else if data:isType("Scalar")set type to"N".
+				local busData is type+data:toString.
+				_ClearTempState().
+				if volume(1):freespace<busData:length or not create(TMP_PATH+"data/"+tag):write(busData)dmsg("[MissionRunner] WARNING! Insufficient volume space or write error! Data bus tag '"+tag+"' is not saved!",true).
+				else movePath(TMP_PATH+"data/"+tag,DATA_BUS_PATH+tag).
+				_ClearTempState().
+				return ApiOK().
+			},
+			"fetch",{
+				parameter tag.
+				if runnerState:bus:hasKey(tag)return runnerState:bus[tag].
+				return"".
 			}
 		).
 		local eventInterface is lex(
 			"enable",runnerInterface:enable,
 			"disable",runnerInterface:disable,
-			"current",runnerInterface:current
+			"current",runnerInterface:current,
+			"fetch",runnerInterface:fetch
 		).
+		local runnerInstance is lex().
 		runnerInterface:add("invoke",{
 			parameter commandName.
-			if runnerState:commands:haskey(commandName)return ApiOK(runnerState:commands[commandName](eventInterface)).
+			if runnerState:commands:hasKey(commandName)return ApiOK(runnerState:commands[commandName](eventInterface)).
 			return ApiFail("Command not found: "+commandName).
 		}).
 		runnerInterface:add("tick",{
 			_ExecuteEventLoop(runnerState,eventInterface).
 		}).
 		eventInterface:add("invoke",runnerInterface:invoke).
-		local runnerInstance is lex().
 		runnerInstance:add("steps",{
 			parameter newSteps.
 			for entry in newSteps{
@@ -105,9 +122,9 @@
 			parameter newEvents.
 			for entry in newEvents{
 				local name is entry[0].
-				local enabled is choose entry[2]if entry:length>2 else true.
+				local enabled is choose entry[2]if entry:length>2else true.
 				if _InvalidKeyName(name)runnerState:errors:add("Mission event '"+name+"' has invalid characters").
-				else if runnerState:events:haskey(name)runnerState:errors:add("Mission event '"+name+"' already exists").
+				else if runnerState:events:hasKey(name)runnerState:errors:add("Mission event '"+name+"' already exists").
 				else runnerState:events:add(name,lex("enabled",enabled,"default",enabled,"invoke",entry[1])).
 			}
 			return runnerInstance.
@@ -117,7 +134,7 @@
 			for entry in newCommands{
 				local name is entry[0].
 				if _InvalidKeyName(name)runnerState:errors:add("Mission command '"+name+"' has invalid characters").
-				else if runnerState:commands:haskey(name)runnerState:errors:add("Mission command '"+name+"' already exists").
+				else if runnerState:commands:hasKey(name)runnerState:errors:add("Mission command '"+name+"' already exists").
 				else runnerState:commands:add(name,entry[1]).
 			}
 			return runnerInstance.
@@ -127,17 +144,36 @@
 				local stateList is open(STATE_FILE):readall:string:split(",").
 				if stateList:length<2 runnerState:errors:add("Saved mission state is malformed").
 				else {
-					set runnerState:currentStep to stateList[0]:toscalar(-1).
-					set runnerState:nextStep to stateList[1]:toscalar(-1).
-					if runnerState:currentStep=-1 or runnerState:nextStep=-1{
-						set runnerState:currentStep to-1.
-						set runnerState:nextStep to-1.
-						runnerState:errors:add("Failed to load current/next step from saved state").
-					}
+					set runnerState:currentStep to stateList[0]:toScalar(-1).
+					set runnerState:nextStep to stateList[1]:toScalar(-1).
+					if runnerState:currentStep<>stateList[0]:toScalar(0)or runnerState:nextStep<>stateList[1]:toScalar(0)runnerState:errors:add("Failed to load current/next step from saved state").
 					for eventName in stateList:sublist(2,stateList:length-2)
-						if runnerState:events:haskey(eventName)_SetEventState(runnerState,eventName,not runnerState:events[eventName]:default).
+						if runnerState:events:hasKey(eventName)
+							set runnerState:events[eventName]:enabled to not runnerState:events[eventName]:default.
 						else dmsg("[MissionRunner] WARNING! Attempted to restore state for mission event: "+eventName,true).
 				}
+			}
+			if exists(DATA_BUS_PATH){
+				local bus is lex().
+				local dataFiles is open(DATA_BUS_PATH):lex.
+				for tag in dataFiles:keys{
+					local fileContent is dataFiles[tag]:readall:string.
+					local type is fileContent[0].
+					local data is fileContent:remove(0,1).
+					local valid is type="S".
+					local parsedData is data.
+					if type="B"{
+						set valid to data="1"or data="0".
+						set parsedData to data="1".
+					}
+					else if type="N"{
+						set parsedData to data:toScalar(0).
+						set valid to parsedData=data:toScalar(1).
+					}
+					if valid bus:add(tag,parsedData).
+					else runnerState:errors:add("Failed to parse tag '"+tag+"' as type '"+type+"': "+data).
+				}
+				set runnerState:bus to bus.
 			}
 			if runnerState:errors:length>0{
 				notify("Mission failed to start").

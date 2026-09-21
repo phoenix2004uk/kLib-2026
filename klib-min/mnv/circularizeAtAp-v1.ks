@@ -1,1 +1,1 @@
-{local A is import("mech/orbitalMechanics-v1"),B is import("mech/orbitalParameters-v1").export({local Z is apoapsis. if Z<0 return ApiFail("There is no apoapsis on a hyperbolic trajectory").return ApiOK(node(time:seconds+eta:apoapsis,0,0,A:v(Z,B:a(Z,Z))-A:v(Z))).}).}
+{local B is import("mech/orbitalMechanics-v1"),C is import("mech/orbitalParameters-v1").export({local A is apoapsis. if A<0return ApiFail("There is no apoapsis on a hyperbolic trajectory").return ApiOK(node(time:seconds+eta:apoapsis,0,0,B:v(A,C:a(A,A))-B:v(A))).}).}

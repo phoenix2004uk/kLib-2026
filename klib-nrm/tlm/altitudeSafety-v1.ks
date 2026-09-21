@@ -33,29 +33,29 @@
 		"Plock", 3330,
 		"Karen", 4604
 	).
-	function selectBody {
+	local selectBody is {
 		parameter targetBodyQuery.
 		if targetBodyQuery:istype("Body") return ApiOK(targetBodyQuery).
 		else if targetBodyQuery:istype("string") and bodyExists(targetBodyQuery) return ApiOK(body(targetBodyQuery)).
 		else return ApiFail(targetBodyQuery:tostring + " is not a valid Body").
-	}
-	function getSafeAltitude {
+	}.
+	local getSafeAltitude is {
 		parameter targetBodyQuery, includeAtmosphereHeight is true.
 		local selectBodyResult is selectBody(targetBodyQuery).
 		if not selectBodyResult:ok return selectBodyResult.
-		local targetBody is selectBodyResult:val,
-			targetBodyName is targetBody:name.
+		local targetBody is selectBodyResult:val.
+		local targetBodyName is targetBody:name.
 		if not MAX_TERRAIN_HEIGHTS:haskey(targetBodyName) return ApiFail(targetBodyQuery:tostring + " does not have a known maximum terrain height").
 		return ApiOK(max(choose targetBody:atm:height if includeAtmosphereHeight and targetBody:atm:exists else 0, MAX_TERRAIN_HEIGHTS[targetBodyName])).
-	}
+	}.
 	export(lex(
-		"altitude", getSafeAltitude@,
+		"altitude", getSafeAltitude,
 		"radius", {
 			parameter targetBodyQuery, includeAtmosphereHeight is true.
 			local selectBodyResult is selectBody(targetBodyQuery).
 			if not selectBodyResult:ok return selectBodyResult.
-			local targetBody is selectBodyResult:val,
-				altitudeResult is getSafeAltitude(targetBody, includeAtmosphereHeight).
+			local targetBody is selectBodyResult:val.
+			local altitudeResult is getSafeAltitude(targetBody, includeAtmosphereHeight).
 			if not altitudeResult:ok return altitudeResult.
 			return ApiOK(altitudeResult:val + targetBody:radius).
 		}

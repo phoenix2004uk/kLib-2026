@@ -28,3 +28,9 @@ klib/prg/airlessDescent-v1.ks
 
 # notes
 .notes
+
+# non-repo minify script/python files
+__pycache__
+minify-regression.expected.ks
+minify-regression.ks
+test_minify.py

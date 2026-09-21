@@ -1,6 +1,5 @@
 {
-	local DELTA is list(0,1,-1).
-	function update_maneuver {
+	local update_maneuver is {
 		parameter mnv,base_data,seek_data,magnitude.
 		set mnv:eta to base_data[0]+(seek_data[0]*magnitude)-time:seconds.
 		set mnv:radialout to base_data[1]+(seek_data[1]*magnitude).
@@ -17,10 +16,10 @@
 		local var_prograde is tuning_parameters:contains("prograde").
 		for i in range(0,81){
 			local seek_data is list(
-				choose DELTA[mod(floor(i/27)+3,3)]if var_time else 0,
-				choose DELTA[mod(floor(i/9)+3,3)]if var_radial else 0,
-				choose DELTA[mod(floor(i/3)+3,3)]if var_normal else 0,
-				choose DELTA[mod(i+3,3)]if var_prograde else 0
+				choose mod(floor(i/27)+1,3)-1 if var_time else 0,
+				choose mod(floor(i/9)+1,3)-1 if var_radial else 0,
+				choose mod(floor(i/3)+1,3)-1 if var_normal else 0,
+				choose mod(i+1,3)-1 if var_prograde else 0
 			).
 			local unique_data is seek_data:join(",").
 			if not seek_unique:contains(unique_data) {

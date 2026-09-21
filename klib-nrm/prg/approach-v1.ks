@@ -9,7 +9,7 @@
 		local lock approachVector to getApproachVector(targetVessel,approachSpeed).
 		lock steering to approachVector.
 		awaitSteering().
-		lock throttle to choose 0 if ship:availableThrust=0 else min(1,min(1,approachVector:mag/2)*mass/ship:availableThrust).
+		lock throttle to choose 0 if availableThrust=0 else min(1,min(1,approachVector:mag/2)*mass/availableThrust).
 		wait until approachVector:mag<.1.
 		lock throttle to 0.
 		unlock steering.
@@ -19,7 +19,7 @@
 		until targetVessel:distance<=targetSeparation{
 			setRelativeVelocity(targetVessel,approachSpeed).
 			lock steering to getApproachVector(targetVessel,0).
-			wait until targetVessel:distance<=targetSeparation or vdot(targetVessel:position,targetVessel:velocity:orbit-velocity:orbit)>=0.
+			wait until targetVessel:distance<=targetSeparation or targetVessel:position*(targetVessel:velocity:orbit-velocity:orbit)>=0.
 			setRelativeVelocity(targetVessel,0).
 			lock steering to getApproachVector(targetVessel,approachSpeed).
 			wait 0.

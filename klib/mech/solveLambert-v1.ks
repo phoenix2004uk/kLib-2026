@@ -186,7 +186,6 @@
 
 			local xNew is x - DT * DDT / denominator.
 			if abs(x - xNew) < LAMBERT_HALLEY_X_TOLERANCE {
-				set x to xNew.
 				break.
 			}
 
@@ -199,7 +198,7 @@
 
 	// Find Izzo's x for one requested Lambert solution.
 	function LambertSolveX {
-		parameter T, lambda, revolutions, branch is "left".
+		parameter T, lambda, revolutions, branch.
 
 		local lambda2 is lambda^2.
 		local lambda3 is lambda2 * lambda.

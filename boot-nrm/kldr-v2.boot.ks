@@ -6,21 +6,20 @@ sas off.
 set config:ipu to 200.
 clearScreen.
 {
-	local _kDebug is core:tag="debug",
-		_kLibRoots is list("0:/klib/","0:/klib-nrm/","0:/klib-min/"),
-		_kMapPath is"1:/kldr-map",
-		_kDmsgLogFile is"0:/dmsg/"+core:part:uid+"-"+ship:name+".log",
-		_kDmsgBufferFile is"1:/dmsg.log",
-		_kGeneration is 0,
-		_kMap is lex(),
-		_kExportStack is stack(),
-		_kLoadStack is stack(),
-		_kLoaded is lex(),
-		_kParents is lex(),
-		_kChildren is lex(),
-		_kDmsgArchiveReady is false.
 	local lock _kConnected to homeConnection:isconnected.
-	global dmsg is{
+	local _kDebug is core:tag="debug".
+	local _kMapPath is "1:/kldr-map".
+	local _kDmsgLogFile is "0:/dmsg/"+core:part:uid+"-"+ship:name+".log".
+	local _kDmsgBufferFile is "1:/dmsg.log".
+	local _kGeneration is 0.
+	local _kMap is lex().
+	local _kExportStack is stack().
+	local _kLoadStack is stack().
+	local _kLoaded is lex().
+	local _kParents is lex().
+	local _kChildren is lex().
+	local _kDmsgArchiveReady is false.
+	global dmsg is {
 		parameter _kMessage,_kPrint is false.
 		if _kPrint print _kMessage.
 		local _kMet is round(missionTime,6):tostring.
@@ -40,72 +39,23 @@ clearScreen.
 		}
 		else if volume(1):freespace-_kMessage:length>500 log _kMessage to _kDmsgBufferFile.
 	}.
-	global notify is{
-		parameter _kMessage.
-		hudtext(_kMessage,5,2,20,YELLOW,false).
-	}.
-	global ApiOK is{
-		parameter _kValue is true,_kMessage is"".
-		return lex("ok",true,"val",_kValue,"msg",_kMessage).
-	}.
-	global ApiFail is{
-		parameter _kMessage,_kValue is false.
-		return lex("ok",false,"val",_kValue,"msg",_kMessage).
-	}.
-	global export is{
-		parameter _kObject.
-		_kExportStack:push(_kObject).
-	}.
-	global import is{
-		parameter _kLibName.
-		local _kParent is choose _kLoadStack:peek if not _kLoadStack:empty else"@".
-		if not _kChildren:haskey(_kParent)set _kChildren[_kParent] to uniqueSet().
-		if not _kParents:haskey(_kLibName)set _kParents[_kLibName] to uniqueSet().
-		_kChildren[_kParent]:add(_kLibName).
-		_kParents[_kLibName]:add(_kParent).
-		if _kLoaded:haskey(_kLibName)return _kLoaded[_kLibName].
-		if _kLoadStack:contains(_kLibName)_kPanic("Error! Circular import: "+_kLibName).
-		local _kPath is _kEnsureLib(_kLibName),
-			_kExportDepth is _kExportStack:length.
-		_kLoadStack:push(_kLibName).
-		runPath(_kPath).
-		_kLoadStack:pop().
-		if _kExportStack:length<>_kExportDepth+1 _kPanic("Error! Invalid export: "+_kLibName).
-		local _kObject is _kExportStack:pop().
-		set _kLoaded[_kLibName] to _kObject.
-		return _kObject.
-	}.
-	global purge is{
-		parameter _kLibName.
-		if not _kLoaded:haskey(_kLibName)return ApiFail("Library not imported: "+_kLibName).
-		if _kParents:haskey(_kLibName){
-			local _kBlocking is _kParents[_kLibName]:copy.
-			_kBlocking:remove("@").
-			if not _kBlocking:empty return ApiFail("Library still has parents",_kBlocking).
-			_kParents[_kLibName]:remove("@").
-			if _kChildren:haskey("@")_kChildren["@"]:remove(_kLibName).
-		}
-		local _kCount is _kDropLib(_kLibName).
-		_kSaveMap().
-		return ApiOK(_kCount).
-	}.
-	function _kPanic{
+	local _kPanic is {
 		parameter _kMessage.
 		dmsg(_kMessage,true).
 		shutdown.
-	}
-	function _kSaveMap{
+	}.
+	local _kSaveMap is {
 		writeJSON(list(_kGeneration,_kMap),_kMapPath).
-	}
-	function _kLibPath{
+	}.
+	local _kLibPath is {
 		parameter _kLibName.
-		return"1:/klib/"+_kLibName+"-"+abs(_kMap[_kLibName])+".ks".
-	}
-	function _kCopyBest{
+		return "1:/klib/"+_kLibName+"-"+abs(_kMap[_kLibName])+".ks".
+	}.
+	local _kCopyBest is {
 		parameter _kName,_kDst.
-		local _kBestSize is -1,
-			_kBestPath is"".
-		for _kRoot in _kLibRoots{
+		local _kBestSize is -1.
+		local _kBestPath is"".
+		for _kRoot in list("0:/klib/","0:/klib-nrm/","0:/klib-min/") {
 			local _kSrc is _kRoot+_kName+".ks".
 			if exists(_kSrc){
 				local _kSize is open(_kSrc):size.
@@ -118,11 +68,11 @@ clearScreen.
 		if _kBestSize<0 return false.
 		copyPath(_kBestPath,_kDst).
 		return true.
-	}
-	function _kEnsureLib{
+	}.
+	local _kEnsureLib is {
 		parameter _kLibName.
-		local _kSource is"0:/klib/"+_kLibName+".ks",
-			_kLocal is"".
+		local _kSource is "0:/klib/"+_kLibName+".ks".
+		local _kLocal is "".
 		if _kMap:haskey(_kLibName){
 			set _kLocal to _kLibPath(_kLibName).
 			if exists(_kLocal){
@@ -154,8 +104,8 @@ clearScreen.
 		}
 		_kSaveMap().
 		return _kLocal.
-	}
-	function _kDropLib{
+	}.
+	local _kDropLib is {
 		parameter _kLibName.
 		local _kCount is 1.
 		if _kChildren:haskey(_kLibName){
@@ -172,11 +122,60 @@ clearScreen.
 			_kMap:remove(_kLibName).
 		}
 		return _kCount.
-	}
+	}.
+	global notify is {
+		parameter _kMessage.
+		hudtext(_kMessage,5,2,20,YELLOW,false).
+	}.
+	global ApiOK is {
+		parameter _kValue is true,_kMessage is"".
+		return lex("ok",true,"val",_kValue,"msg",_kMessage).
+	}.
+	global ApiFail is {
+		parameter _kMessage,_kValue is false.
+		return lex("ok",false,"val",_kValue,"msg",_kMessage).
+	}.
+	global export is {
+		parameter _kObject.
+		_kExportStack:push(_kObject).
+	}.
+	global import is {
+		parameter _kLibName.
+		local _kParent is choose _kLoadStack:peek if not _kLoadStack:empty else"@".
+		if not _kChildren:haskey(_kParent)set _kChildren[_kParent] to uniqueSet().
+		if not _kParents:haskey(_kLibName)set _kParents[_kLibName] to uniqueSet().
+		_kChildren[_kParent]:add(_kLibName).
+		_kParents[_kLibName]:add(_kParent).
+		if _kLoaded:haskey(_kLibName)return _kLoaded[_kLibName].
+		if _kLoadStack:contains(_kLibName)_kPanic("Error! Circular import: "+_kLibName).
+		local _kPath is _kEnsureLib(_kLibName).
+		local _kExportDepth is _kExportStack:length.
+		_kLoadStack:push(_kLibName).
+		runPath(_kPath).
+		_kLoadStack:pop().
+		if _kExportStack:length<>_kExportDepth+1 _kPanic("Error! Invalid export: "+_kLibName).
+		local _kObject is _kExportStack:pop().
+		set _kLoaded[_kLibName] to _kObject.
+		return _kObject.
+	}.
+	global purge is {
+		parameter _kLibName.
+		if not _kLoaded:haskey(_kLibName)return ApiFail("Library not imported: "+_kLibName).
+		if _kParents:haskey(_kLibName){
+			local _kBlocking is _kParents[_kLibName]:copy.
+			_kBlocking:remove("@").
+			if not _kBlocking:empty return ApiFail("Library still has parents",_kBlocking).
+			_kParents[_kLibName]:remove("@").
+			if _kChildren:haskey("@")_kChildren["@"]:remove(_kLibName).
+		}
+		local _kCount is _kDropLib(_kLibName).
+		_kSaveMap().
+		return ApiOK(_kCount).
+	}.
 	dmsg("[kldr] Boot "+ship:tostring+" tag="+char(34)+core:tag+char(34)+" at "+time:seconds).
-	local _kMissionName is choose ship:name if _kDebug or core:tag=""else core:tag,
-		_kMissionSource is"0:/missions/"+_kMissionName+".ks",
-		_kMain is"1:/main.ks".
+	local _kMissionName is choose ship:name if _kDebug or core:tag=""else core:tag.
+	local _kMissionSource is "0:/missions/"+_kMissionName+".ks".
+	local _kMain is "1:/main.ks".
 	if exists(_kMapPath){
 		local _kState is readJSON(_kMapPath).
 		set _kGeneration to _kState[0].

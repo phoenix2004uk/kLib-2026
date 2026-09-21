@@ -1,1 +1,1 @@
-{local Z is constant:e. export(lex("cosh",{parameter X. return(Z^X+Z^(-X))/2.},"acosh",{parameter X. return ln(X+sqrt(X^2-1)).},"sinh",{parameter X. return(Z^X-Z^(-X))/2.},"asinh",{parameter X. return ln(X+sqrt(X^2+1)).})).}
+{local A is constant:e. export(lex("cosh",{parameter B.return(A^B+A^(-B))/2.},"acosh",{parameter A.return ln(A+sqrt(A^2-1)).},"sinh",{parameter B.return(A^B-A^(-B))/2.},"asinh",{parameter A.return ln(A+sqrt(A^2+1)).})).}

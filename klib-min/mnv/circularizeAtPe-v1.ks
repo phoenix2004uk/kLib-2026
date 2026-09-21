@@ -1,1 +1,1 @@
-{local A is import("mech/orbitalMechanics-v1"),B is import("mech/orbitalParameters-v1").export({local Z is periapsis. return ApiOK(node(time:seconds+eta:periapsis,0,0,A:v(Z,B:a(Z,Z))-A:v(Z))).}).}
+{local B is import("mech/orbitalMechanics-v1"),C is import("mech/orbitalParameters-v1").export({local A is periapsis. return ApiOK(node(time:seconds+eta:periapsis,0,0,B:v(A,C:a(A,A))-B:v(A))).}).}

@@ -81,7 +81,7 @@
 		) - departurePosition:normalized.
 
 		local transferEccentricity is eccentricityVector:mag.
-		local semilatusRectum is angularMomentumVector:mag^2 / targetBody:mu.
+		local semilatusRectum is angularMomentumVector:sqrmagnitude / targetBody:mu.
 		local periapsisRadius is semilatusRectum / (1 + transferEccentricity).
 
 		local minimumArcRadius is min(departurePosition:mag, arrivalPosition:mag).
@@ -206,7 +206,6 @@
 
 		local targetBody is targetOrbit:body.
 		local angularMomentumVector is -vcrs(positionVector, velocityVector).
-		local angularMomentumMag is angularMomentumVector:mag.
 
 		local eccentricityVector is (
 			-vcrs(velocityVector, angularMomentumVector) / targetBody:mu
@@ -238,31 +237,28 @@
 			"periapsis", targetOrbit:periapsis,
 			"radialVector", radialVector,
 			"transverseVector", transverseVector,
-			"semilatusRectum", angularMomentumMag^2 / targetBody:mu,
-			"velocityFactor", targetBody:mu / angularMomentumMag,
+			"semilatusRectum", angularMomentumVector:sqrmagnitude / targetBody:mu,
+			"velocityFactor", targetBody:mu / angularMomentumVector:mag,
 			"planeNormal", angularMomentumVector:normalized,
 			"transitionUT", transitionUT
 		).
 	}
 
-	// Snapshot a real Orbitable at an exact specified UT.
+	// Snapshot ship at an exact specified UT.
 	// Used for the ship so POSITIONAT/VELOCITYAT retain normal flight prediction.
-	function createOrbitableSnapshot {
-		parameter targetOrbitable, referenceUT.
-
-		local targetOrbit is targetOrbitable:orbit.
-		local targetBody is targetOrbit:body.
+	function createShipSnapshot {
+		local referenceUT is time:seconds.
 		local transitionUT is false.
 
-		if targetOrbit:hasnextpatch {
-			set transitionUT to referenceUT + targetOrbit:nextpatcheta.
+		if obt:hasnextpatch {
+			set transitionUT to referenceUT + obt:nextpatcheta.
 		}
 
 		return createOrbitSnapshotFromState(
-			targetOrbit,
+			obt,
 			referenceUT,
-			positionAt(targetOrbitable, referenceUT) - targetBody:position,
-			velocityAt(targetOrbitable, referenceUT):orbit,
+			positionAt(ship, referenceUT) - body:position,
+			velocityAt(ship, referenceUT):orbit,
 			transitionUT
 		).
 	}
@@ -1121,7 +1117,6 @@
 		cfg:progressChase(phaseCellSize, maxIterations).
 
 		local evaluationState is createEvaluationState("boundary", cfg).
-		local initialCandidate is candidate.
 		local best is candidate.
 		local iterations is 0.
 
@@ -1387,9 +1382,7 @@
 		if not configResult:ok return configResult.
 		local cfg is configResult:val.
 
-		// Freeze the ship at an exact search reference UT. The target Orbit snapshots itself at the time its current state is sampled.
-		local referenceUT is time:seconds.
-		local shipSnapshot is createOrbitableSnapshot(ship, referenceUT).
+		local shipSnapshot is createShipSnapshot().
 		local targetSnapshot is createOrbitSnapshot(targetOrbit).
 
 		local departureWindowResult is calculateDepartureWindow(shipSnapshot, cfg).

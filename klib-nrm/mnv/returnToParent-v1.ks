@@ -14,7 +14,7 @@
 		local escapeDirection is vxcl(orbitNormal,choose -body:velocity:orbit if burnUT=0 else -velocityAt(body,burnUT):orbit):normalized.
 		local burnRadial is escapeDirection*cos(escapeTrueAnomaly)-vcrs(orbitNormal,escapeDirection)*sin(escapeTrueAnomaly).
 		local currentRadial is up:vector.
-		set burnUT to time:seconds+OrbitalMechanics:dtV(mod(arctan2(vdot(vcrs(currentRadial,burnRadial),orbitNormal),vdot(currentRadial,burnRadial))+360,360)).
+		set burnUT to time:seconds+OrbitalMechanics:dtV(mod(arctan2(vcrs(currentRadial,burnRadial)*orbitNormal,currentRadial*burnRadial)+360,360)).
 		return node(burnUT,0,0,OrbitalMechanics:v(parkingAltitude,escapeSemiMajorAxis,body)-OrbitalMechanics:v(parkingAltitude,parkingSemiMajorAxis,body)).
 	}
 	export({

@@ -45,11 +45,11 @@
 			parameter targetVesselOrPart.
 			local targetVessel is targetVesselOrPart.
 			if targetVesselOrPart:hassuffix("ship")set targetVessel to targetVesselOrPart:ship.
-			local vecVelocityError is targetVessel:velocity:orbit-ship:velocity:orbit.
+			local vecVelocityError is targetVessel:velocity:orbit-velocity:orbit.
 			until vecVelocityError:mag<.05{
 				rcsVectorTranslate(vecVelocityError,vecVelocityError:mag/.5).
 				wait 0.
-				set vecVelocityError to targetVessel:velocity:orbit-ship:velocity:orbit.
+				set vecVelocityError to targetVessel:velocity:orbit-velocity:orbit.
 			}
 			rcsTranslateOff().
 		},

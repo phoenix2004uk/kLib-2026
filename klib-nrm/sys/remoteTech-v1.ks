@@ -1,17 +1,14 @@
 {
 	local RT_MODULE_NAME is "ModuleRTAntenna".
-
-	function isModuleOmni {
+	local isModuleOmni is {
 		parameter module.
 		return module:hasField("omni range").
-	}
-
-	function isModuleDish {
+	}.
+	local isModuleDish is {
 		parameter module.
 		return module:hasField("dish range").
-	}
-
-	function createAntennaInterface {
+	}.
+	local createAntennaInterface is {
 		parameter module.
 		local antennaPart is module:part.
 		local partUid is antennaPart:uid.
@@ -54,8 +51,7 @@
 				return true.
 			}
 		).
-	}
-
+	}.
 	export(lex(
 		"getAntennae", {
 			parameter nameOrTag.

@@ -2,14 +2,14 @@
 	local orbitalParameters is import("mech/orbitalParameters-v1").
 	local orbitalMechanics is import("mech/orbitalMechanics-v1").
 	local velocityChangeToNode is import("mnv/velocityChangeToNode-v1").
-	local changeInclination is{
+	local changeInclination is {
 		parameter targetInclination,utNode,errorMargin,isDN is false.
 		if obt:inclination>=targetInclination-errorMargin and obt:inclination<=targetInclination+errorMargin return ApiOK(node(time:seconds,0,0,0),"Inclination is within "+errorMargin+"° limit of "+targetInclination+"°: "+obt:inclination+"°").
 		if obt:eccentricity>=1 return ApiFail("Change inclination is not supported on an open orbit: e="+round(obt:eccentricity,4)).
-		local theta is targetInclination-obt:inclination.
-		if isDN set theta to-theta.
 		local futureShipRaw is positionAt(ship,utNode).
 		local shipVelocityAtNode is velocityAt(ship,utNode):orbit.
+		local theta is targetInclination-obt:inclination.
+		if isDN set theta to -theta.
 		return ApiOK(velocityChangeToNode(
 			utNode,
 			futureShipRaw-body:position,

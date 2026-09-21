@@ -22,24 +22,24 @@
 	}
 	function descentControl{
 		parameter verticalPid,horizontalPid,targetVerticalSpeed,maxGroundSpeed,fallbackVector.
-		if ship:availableThrust<=0 return list(fallbackVector,0,0,0).
+		if availablethrust<=0 return list(fallbackVector,0,0,0).
 		local gravityAcceleration is body:mu/(body:radius+altitude)^2.
-		local maxThrustAcceleration is ship:availableThrust/ship:mass.
+		local maxThrustAcceleration is availablethrust/mass.
 		local controlTime is time:seconds.
 		set verticalPid:setpoint to targetVerticalSpeed.
 		set verticalPid:minOutput to-gravityAcceleration.
 		set verticalPid:maxOutput to maxThrustAcceleration-gravityAcceleration.
 		local verticalThrustAcceleration is gravityAcceleration+verticalPid:update(controlTime,verticalSpeed).
+		local horizontalThrustAcceleration is 0.
+		local horizontalVelocity is vxcl(up:vector,velocity:surface).
 		set horizontalPid:setpoint to maxGroundSpeed.
 		set horizontalPid:minOutput to-sqrt(max(0,maxThrustAcceleration^2-verticalThrustAcceleration^2)).
 		set horizontalPid:maxOutput to 0.
-		local horizontalThrustAcceleration is 0.
 		if groundSpeed<=horizontalPid:epsilon{
 			set horizontalPid:ki to 0.
 			horizontalPid:reset().
 		}
 		else set horizontalThrustAcceleration to-horizontalPid:update(controlTime,groundSpeed).
-		local horizontalVelocity is vxcl(up:vector,ship:velocity:surface).
 		if horizontalThrustAcceleration>0{
 			set verticalThrustAcceleration to min(maxThrustAcceleration,max(1e-6,verticalThrustAcceleration)).
 			set horizontalThrustAcceleration to min(horizontalThrustAcceleration,sqrt(max(0,maxThrustAcceleration^2-verticalThrustAcceleration^2))).
@@ -115,7 +115,7 @@
 			}
 		}
 		smoothThrottle:setTarget(0).
-		local impactVelocityMagnitude is ship:velocity:surface:mag.
+		local impactVelocityMagnitude is velocity:surface:mag.
 		local resultStatus is choose status if impactVelocityMagnitude<=10 else"CRASHED".
 		set wantedThrottle to 0.
 		displayDescent(resultStatus,bottomAltRadar,0,0,wantedThrottle).

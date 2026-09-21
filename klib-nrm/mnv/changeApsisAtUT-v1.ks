@@ -1,6 +1,6 @@
 {
 	local velocityChangeToNode is import("mnv/velocityChangeToNode-v1").
-	function changeApsisAtUT{
+	local changeApsisAtUT is {
 		parameter targetApsis,burnUT,changePeriapsis.
 		if burnUT<=time:seconds return ApiFail("Maneuver UT must be in the future").
 		local burnOrbit is orbitAt(ship,burnUT).
@@ -31,9 +31,9 @@
 			else return ApiFail("Target orbit is unreachable from the burn position").
 		}
 		local radialSign is 1.
-		if vdot(vecVelocityAtBurn,vecRadial)<0 set radialSign to-1.
+		if vecVelocityAtBurn*vecRadial<0 set radialSign to-1.
 		return ApiOK(velocityChangeToNode(burnUT,vecPositionAtBurn,vecVelocityAtBurn,vecRadial*radialSign*sqrt(targetRadialSpeedSquared)+vecTransverse*targetTransverseSpeed)).
-	}
+	}.
 	export(lex(
 		"Pe",{
 			parameter targetPeriapsis,burnUT.

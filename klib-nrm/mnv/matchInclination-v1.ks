@@ -23,9 +23,9 @@
 			set nodes["first"]to"DN".
 			set nodes["last"]to"AN".
 		}
-		set nodes["AN"]to ship:orbit:trueanomaly+thetaAN.
-		set nodes["DN"]to ship:orbit:trueanomaly+thetaDN.
-		if orbit:eccentricity<1{
+		set nodes["AN"]to obt:trueanomaly+thetaAN.
+		set nodes["DN"]to obt:trueanomaly+thetaDN.
+		if obt:eccentricity<1{
 			set nodes["AN"]to mod(360+nodes["AN"],360).
 			set nodes["DN"]to mod(360+nodes["DN"],360).
 		}
@@ -42,7 +42,7 @@
 		else return ApiFail("Not a valid node selection: "+whichNode).
 		local nodeTrueAnomaly is nodes[selectedNode].
 		local etaNextNode is 0.
-		if orbit:eccentricity<1 set etaNextNode to OrbitalMechanics:etaV(nodeTrueAnomaly).
+		if obt:eccentricity<1 set etaNextNode to OrbitalMechanics:etaV(nodeTrueAnomaly).
 		else{
 			if (nodeTrueAnomaly<-abs(OrbitalParameters:Vlim())or nodeTrueAnomaly>abs(OrbitalParameters:Vlim()))return ApiFail("The trueanomaly is beyond the hyperbolic limit for the selected node: "+selectedNode).
 			set etaNextNode to OrbitalMechanics:etaVh(nodeTrueAnomaly).

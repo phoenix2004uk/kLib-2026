@@ -107,7 +107,10 @@
 		"Van", TrueAnomalyOfAN@,
 		"Vdn", TrueAnomalyOfDN@,
 		"Vr", TrueAnomalyRadius@,
-		"Vh", { parameter V0, a is orbit:semimajoraxis, e is orbit:eccentricity, b is body. return TrueAnomalyRadius(V0, a, e) - b:radius. },
+		"Vh", {
+			parameter V0, a is orbit:semimajoraxis, e is orbit:eccentricity, b is body.
+			return TrueAnomalyRadius(V0, a, e) - b:radius.
+		},
 		"E", EccentricAnomaly@,
 		"F", HyperbolicAnomaly@,
 		"M", MeanAnomaly@,
