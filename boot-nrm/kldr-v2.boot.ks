@@ -26,7 +26,7 @@ clearScreen.
 	local lock _kConnected to homeConnection:isconnected.
 	local _kDebug is core:tag="debug".
 	local _kMapPath is "1:/kldr-map".
-	local _kDmsgLogFile is "0:/dmsg/"+core:part:uid+"-"+ship:name+".log".
+	local _kDmsgLogFile is "0:/dmsg/"+ship:name+"-"+core:part:uid+".log".
 	local _kDmsgBufferFile is "1:/dmsg.log".
 	local _kGeneration is 0.
 	local _kMap is lex().
