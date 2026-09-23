@@ -394,12 +394,18 @@
 			return ApiFail("Mission runner bus tag '" + tag + "' has invalid characters").
 		}
 
-		if runnerState:bus:hasKey(tag) {
-			set runnerState:bus[tag] to data.
-		}
-		else {
-			runnerState:bus:add(tag, data).
-		}
+		// due to a kOS compiler bug, we cannot do `set runnerState:bus[tag] to data`
+		// as it compiles as something like `set "bus"[tag] to data`, which throws an exception:
+		// Strings are immutable; they can not be modified using the syntax "SET string[1] TO 'a'", etc.
+		// if runnerState:bus:hasKey(tag) {
+		// 	set runnerState:bus[tag] to data.
+		// }
+		// else {
+		// 	runnerState:bus:add(tag, data).
+		// }
+		local bus is runnerState:bus.
+		set bus[tag] to data.
+
 		_SaveBusEntry(tag, data).
 
 		return ApiOK().
@@ -479,93 +485,3 @@
 	}
 	export(lex("create", createMissionRunner@)).
 }
-
-// EXAMPLE USAGE
-
-// // Mission Parameters
-// local launchApoapsis is 100e3.
-// local launchInclination is 0.
-
-// // regular klib imports
-// local rt is import("sys/remoteTech-v1").
-
-// // use import() for common steps
-// local ascent is import("prg/atmosphericAscent-v2").
-// local orbitalInsertion is import("op/orbitalInsertion-v1").
-// local mnvCircularize is import("mnv/circularizeAtApsis-v1").
-
-// // import, create and start the mission runner via function chaining
-// import("missionRunner-v1")
-// :create(list(
-// 	list("prelaunch", {
-// 		parameter runner.
-// 		runner:next().
-// 	}),
-// 	list("launch", {
-// 		parameter runner.
-// 		ascent:executeAscent(launchApoapsis, launchInclination, runner:tick). // the internal blocking loop can now call the tick() function to execute the event loop
-// 		runner:next().
-// 	}), // steps can be "blocking", which means the mission loop is not running until the step completes via `runner:next()`
-// 	list("orbitalInsertion", orbitalInsertion),
-// 	list("circularize", {
-// 		parameter runner.
-
-// 		mnvCircularize:Ap().
-// 		runner:next().
-// 	}),
-// 	list("executeNode", {
-// 		parameter runner.
-// 	})
-// ))
-// :events(list( // all event functions will run continuously in the background of the mission, so these should most do a cheap check to invoke something
-// 	list("low-power", {
-// 		parameter events.
-// 		for res in ship:resources {
-// 			if res:name = "ELECTRICCHARGE" and res:amount / res:capacity < 0.3 {
-// 				// we can disable and enable events, so that it acts similar to a state machine and prevents running excess event code in the main loop
-// 				// when toggling opposing events, always enable the replacement before disabling the current
-// 				events:enable("high-power").
-// 				events:disable("low-power").
-// 				events:invoke("comms-off").
-// 				break.
-// 			}
-// 		}
-// 	}),
-// 	list("high-power", {
-// 		parameter events.
-// 		for res in ship:resources {
-// 			if res:name = "ELECTRICCHARGE" and res:amount / res:capacity > 0.6 {
-// 				// when toggling opposing events, always enable the replacement before disabling the current
-// 				events:enable("low-power").
-// 				events:disable("high-power").
-// 				events:invoke("comms-on").
-// 				break.
-// 			}
-// 		}
-// 	}, false)
-// ))
-// :commands(list( // commands can be called by steps or events, and are really just functions you would otherwise call anywhere in a regular mission script
-// 	list("comms-on", {
-// 		parameter commands.
-
-// 		notify("Deploying communication dish").
-// 		for dish in rt:getAllDish() {
-// 			dish:enable().
-// 			dish:setTarget(Kerbin).
-// 		}
-// 	}),
-// 	list("comms-off", {
-// 		parameter commands.
-
-// 		notify("Communication disabled").
-// 		for dish in rt:getAllDish() {
-// 			dish:disable().
-// 		}
-// 	}),
-// 	list("do-science", {
-// 		parameter commands.
-
-// 		// do some science!
-// 	})
-// ))
-// :start().

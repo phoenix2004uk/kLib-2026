@@ -70,8 +70,8 @@
 				parameter tag,data.
 				if not(data:isType("String")or data:isType("Scalar")or data:isType("Boolean"))return ApiFail("Mission runner bus does not support data type: "+data:typename).
 				if _InvalidKeyName(tag)return ApiFail("Mission runner bus tag '"+tag+"' has invalid characters").
-				if runnerState:bus:hasKey(tag)set runnerState:bus[tag]to data.
-				else runnerState:bus:add(tag,data).
+				local bus is runnerState:bus.
+				set bus[tag] to data.
 				local type is"S".
 				if data:isType("Boolean"){
 					set type to"B".

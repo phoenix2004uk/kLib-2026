@@ -1,5 +1,6 @@
 {
 	local awaitSteering is import("sys/steering-v1"):awaitSteering.
+	local autostage is import("sys/staging-v1"):autostage.
 	local burnDuration is {
 		parameter dV, at_stage is stage:number.
 		local m is 0.
@@ -38,8 +39,11 @@
 			lock steering to mnv:deltaV.
 			awaitSteering().
 			wait until mnv:eta <= halfBurnDuration.
-			lock throttle to max(0.001, min(mnv:deltaV:mag * mass / availableThrust, 1)).
-			wait until dV0 * mnv:deltaV < 0 or (mnv:deltaV:mag < 1e-2 and dV0 * mnv:deltaV < 0.5).
+			lock throttle to max(0.001, min(mnv:deltaV:mag * mass / max(1e-6, availableThrust), 1)).
+			until dV0 * mnv:deltaV < 0 or (mnv:deltaV:mag < 1e-2 and dV0 * mnv:deltaV < 0.5) {
+				autostage().
+				wait 0.
+			}
 			lock throttle to 0.
 			unlock steering.
 			wait 0.1.

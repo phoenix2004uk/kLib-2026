@@ -1,6 +1,6 @@
-// #include "../kldr-stub.ks"
 {
 	local awaitSteering is import("sys/steering-v1"):awaitSteering.
+	local autostage is import("sys/staging-v1"):autostage.
 
 	function isCurrentStageEngineActive {
 		parameter en, at_stage.
@@ -60,6 +60,7 @@
 
 	local BURN_PRECISION is 1e-2.
 	local BURN_THRUST_MIN is 0.001.
+	local ZERO_THRUST_LIMIT is 1e-6.
 	function executeNode {
 		parameter leadTime is 60.
 
@@ -76,12 +77,15 @@
 		lock steering to mnv:burnvector.
 		awaitSteering().
 
-		local lock max_acceleration to ship:availablethrust / ship:mass.
+		local lock max_acceleration to max(ZERO_THRUST_LIMIT, ship:availablethrust) / ship:mass.
 		local lock mnv_throttle to max(BURN_THRUST_MIN, min(mnv:deltav:mag / max_acceleration, 1)).
 
 		wait until mnv:eta <= halfBurnDuration.
 		lock throttle to mnv_throttle.
-		wait until vdot(dV0, mnv:deltav) < 0 or (mnv:deltav:mag < BURN_PRECISION and vdot(dV0, mnv:deltav) < 0.5).
+		until vdot(dV0, mnv:deltav) < 0 or (mnv:deltav:mag < BURN_PRECISION and vdot(dV0, mnv:deltav) < 0.5) {
+			autostage().
+			wait 0.
+		}
 		lock throttle to 0.
 		unlock steering.
 		unlock max_acceleration.
