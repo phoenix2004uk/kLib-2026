@@ -1,38 +1,73 @@
 clearScreen.
 local MAX_TERRAIN_HEIGHTS is lex(
-	"Sun", 0,
-	"Kerbin", 0,
-	"Mun", 7500,
-	"Minmus", 6e3,
-	"Moho", 7e3,
-	"Eve", 0,
-	"Duna", 0,
-	"Ike", 13e3,
-	"Jool", 0,
-	"Laythe", 0,
-	"Vall", 8500,
-	"Bop", 22e3,
-	"Tylo", 12e3,
-	"Gilly", 7e3,
-	"Pol", 6e3,
-	"Dres", 0,
-	"Eeloo", 0,
-	"Sarnus", 0,
-	"Hale", 0,
-	"Ovok", 0,
-	"Slate", 0,
-	"Tekto", 0,
-	"Urlum", 0,
-	"Polta", 0,
-	"Priax", 0,
-	"Wal", 0,
-	"Tal", 0,
-	"Neidon", 0,
-	"Thatmo", 0,
-	"Nissee", 0,
-	"Plock", 0,
-	"Karen", 0
+	"Sun",       0,
+	"Kerbin",    6760,
+	"Mun",       7057,
+	"Minmus",    5725,
+	"Moho",      6816,
+	"Eve",       7537,
+	"Duna",      8264,
+	"Ike",       12734,
+	"Jool",      0,
+	"Laythe",    6060,
+	"Vall",      7975,
+	"Bop",       21755,
+	"Tylo",      12894,
+	"Gilly",     6401,
+	"Pol",       4889,
+	"Dres",      5670,
+	"Eeloo",     3795,
+	"Sarnus",    0,
+	"Hale",      5918,
+	"Ovok",      14000,
+	"Slate",     16398,
+	"Tekto",     5873,
+	"Urlum",     0,
+	"Polta",     8649,
+	"Priax",     30483,
+	"Wal",       20773,
+	"Tal",       11777,
+	"Neidon",    0,
+	"Thatmo",    4825,
+	"Nissee",    8936,
+	"Plock",     3330,
+	"Karen",     4604,
+	"Edas",      4943,
+	"Vant",      19852,
+	"Zore",      17726,
+	"LintMikey", 1880,
+	"Crokslev",  3700,
+	"Geito",     661,
+	"Havous",    66047,
+	"Kal",       551,
+	"KiKi",      16039,
+	"Mracksis",  6373,
+	"Flake",     246,
+	"Ervo",      6880,
+	"Archae",    4141,
+	"Soden",     5188,
+	"Lon",       2662
 ).
+
+// Find root body
+local rootBody is body.
+until not rootBody:hasBody {
+	set rootBody to rootBody:body.
+}
+if not MAX_TERRAIN_HEIGHTS:hasKey(rootBody:name) {
+	MAX_TERRAIN_HEIGHTS:add(rootBody:name, 0).
+}
+// Add all orbiting bodies recursively
+function addSatelliteBodies {
+	parameter parentBody.
+	for satelliteBody in parentBody:orbitingChildren {
+		if not MAX_TERRAIN_HEIGHTS:hasKey(satelliteBody:name) {
+			MAX_TERRAIN_HEIGHTS:add(satelliteBody:name, 0).
+		}
+		addSatelliteBodies(satelliteBody).
+	}
+}
+addSatelliteBodies(rootBody).
 
 global MAX_NAME_LENGTH is 0.
 for b in MAX_TERRAIN_HEIGHTS:keys if b:length > MAX_NAME_LENGTH set MAX_NAME_LENGTH to b:length.
@@ -59,7 +94,7 @@ function selectBody {
 }
 
 // This function will calculate the max terrain height of the specified body,
-// store it in MAX_TERRAIN_HEIGHTS and append "bodyName,maxTerrainHeight" to bodies.csv.
+// and append "bodyName,maxTerrainHeight" to bodies.csv.
 function calculateMaxTerrainHeight {
 	parameter targetBodyQuery.
 
@@ -381,19 +416,19 @@ function calculateMaxTerrainHeight {
 
 set config:ipu to 2000.
 
-// calculateMaxTerrainHeight(Mun).
-
 local resuming is core:tag <> "".
 local skipping is true.
 for bodyName in MAX_TERRAIN_HEIGHTS:keys {
-	if not resuming and not skipping {
-		set core:tag to bodyName.
-		kuniverse:quicksave().
-	}
-	if not resuming or not skipping or bodyName = core:tag {
-		calculateMaxTerrainHeight(bodyName).
-		set skipping to false.
-		set resuming to false.
+	if MAX_TERRAIN_HEIGHTS[bodyName] = 0 {
+		if not resuming and not skipping {
+			set core:tag to bodyName.
+			kuniverse:quicksave().
+		}
+		if not resuming or not skipping or bodyName = core:tag {
+			calculateMaxTerrainHeight(bodyName).
+			set skipping to false.
+			set resuming to false.
+		}
 	}
 }
 print "Script Complete".
