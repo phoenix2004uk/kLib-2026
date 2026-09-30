@@ -115,7 +115,8 @@
 
 		if e = 0 {
 			// print "Error: TrueAnomaliesAtRadius is not valid for circular orbits".
-			return list(0, 180).
+			if abs(radius - rp) < FLOATING_POINT_TOLERANCE return list(0, 180).
+			return list().
 		}
 
 		local p is rp * (1 + e).

@@ -8,7 +8,10 @@
 	}.
 	local TrueAnomaliesAtRadius is {
 		parameter radius, rp is periapsis + body:radius, e is obt:eccentricity.
-		if e = 0 return list(0, 180).
+		if e = 0 {
+			if abs(radius - rp) < FLOATING_POINT_TOLERANCE return list(0, 180).
+			return list().
+		}
 		local x is ((rp * (1 + e)) / radius - 1) / e.
 		if abs(x) > 1 {
 			if abs(x) - 1 < FLOATING_POINT_TOLERANCE set x to round(x).
