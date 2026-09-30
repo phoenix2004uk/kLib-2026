@@ -1,9 +1,29 @@
 {
 	local math is import("util/math-v1").
+	local FLOATING_POINT_TOLERANCE is 1e-9.
 	local RadToDeg is constant:RadToDeg.
 	local TrueAnomalyRadius is {
-		parameter V0, a is obt:semimajoraxis, e is obt:eccentricity.
-		return (a * (1 - e^2)) / (1 + e * cos(V0)).
+		parameter V0, rp is periapsis + body:radius, e is obt:eccentricity.
+		return ( rp * (1 + e)) / (1 + e * cos(V0)).
+	}.
+	local TrueAnomaliesAtRadius is {
+		parameter radius, rp is periapsis + body:radius, e is obt:eccentricity.
+		if e = 0 return list(0, 180).
+		local x is ((rp * (1 + e)) / radius - 1) / e.
+		if abs(x) > 1 {
+			if abs(x) - 1 < FLOATING_POINT_TOLERANCE set x to round(x).
+			else {
+				print "Error: TrueAnomaliesAtRadius cannot determine V from invalid orbital geometry".
+				return list().
+			}
+		}
+		local V0 is arccos(x).
+		if V0 < FLOATING_POINT_TOLERANCE return list(0).
+		if e < 1 {
+			if 180 - V0 < FLOATING_POINT_TOLERANCE return list(180).
+			return list(V0, 360 - V0).
+		}
+		return list(-V0, V0).
 	}.
 	export(lex(
 		"a", {
@@ -28,8 +48,13 @@
 		},
 		"Vr", TrueAnomalyRadius,
 		"Vh", {
-			parameter V0, a is obt:semimajoraxis, e is obt:eccentricity, b is body.
-			return TrueAnomalyRadius(V0, a, e) - b:radius.
+			parameter V0, rp is periapsis + body:radius, e is obt:eccentricity, b is body.
+			return TrueAnomalyRadius(V0, rp, e) - b:radius.
+		},
+		"rV", TrueAnomaliesAtRadius,
+		"hV", {
+			parameter h, rp is periapsis + body:radius, e is obt:eccentricity, b is body.
+			return TrueAnomaliesAtRadius(h + b:radius, rp, e).
 		},
 		"E", {
 			parameter V0, e is obt:eccentricity.

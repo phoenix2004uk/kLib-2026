@@ -86,6 +86,7 @@
 		}
 
 		// Check if we encounter another body before parent periapsis
+		// TODO: This should be caller logic
 		local parentPatch is mnv:orbit:nextPatch.
 		if parentPatch:hasNextPatch and parentPatch:eta:transition < parentPatch:eta:periapsis {
 			return ApiFail("We will encounter another body before periapsis: " + parentPatch:nextPatch:body, true).

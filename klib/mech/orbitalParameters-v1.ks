@@ -1,5 +1,6 @@
 {
 	local math is import("util/math-v1").
+	local FLOATING_POINT_TOLERANCE is 1e-9.
 
 	// works for elliptical orbits (e<1 -> a>0) and hyperbolic trajectories (e>1 -> a<0)
 	function SemiMajorAxis {
@@ -12,8 +13,9 @@
 
 	// Returns the maximum absolute true anomaly.
 	// Elliptical: returns 180 degrees.
+	// Parabolic: returns 180 degrees (asymptotic limit).
 	// Hyperbolic: returns the asymptotic true anomaly.
-	//             Physical trajectory is -Vlimit < V < +Vlimit.
+	// Physical open trajectory is -Vlimit < V < +Vlimit.
 	// Note: kOS represents elliptical true anomaly as 0..360,
 	//       but open-orbit true anomaly as -180..180.
 	function TrueAnomalyLimit {
@@ -94,11 +96,48 @@
 		return (e * math:sinh(Fr) - Fr) * constant:radToDeg.
 	}
 
-	// works for elliptical orbits and hyperbolic trajectories
+	// works for elliptical orbits and para/hyperbolic trajectories by using semi-latus rectum: p=rp(1+e)
 	function TrueAnomalyRadius {
-		parameter V0, a is orbit:semimajoraxis, e is orbit:eccentricity.
+		parameter V0,
+			rp is orbit:periapsis + orbit:body:radius,
+			e is orbit:eccentricity.
 
-		return (a * (1 - e^2)) / (1 + e * cos(V0)).
+		local p is rp * (1 + e).
+		return p / (1 + e * cos(V0)).
+	}
+
+	// works for elliptical orbits and para/hyperbolic trajectories
+	// circular orbits return representative opposite anomalies 0 and 180
+	function TrueAnomaliesAtRadius {
+		parameter radius,
+			rp is orbit:periapsis + orbit:body:radius,
+			e is orbit:eccentricity.
+
+		if e = 0 {
+			// print "Error: TrueAnomaliesAtRadius is not valid for circular orbits".
+			return list(0, 180).
+		}
+
+		local p is rp * (1 + e).
+		local x is (p / radius - 1) / e.
+
+		if abs(x) > 1 {
+			if abs(x) - 1 < FLOATING_POINT_TOLERANCE {
+				set x to round(x).
+			} else {
+				print "Error: TrueAnomaliesAtRadius cannot determine V from invalid orbital geometry".
+				return list().
+			}
+		}
+
+		local V0 is arccos(x).
+
+		if V0 < FLOATING_POINT_TOLERANCE return list(0).
+		if e < 1 {
+			if 180 - V0 < FLOATING_POINT_TOLERANCE return list(180).
+			return list(V0, 360 - V0).
+		}
+		return list(-V0, V0).
 	}
 
 	export(lex(
@@ -107,9 +146,21 @@
 		"Van", TrueAnomalyOfAN@,
 		"Vdn", TrueAnomalyOfDN@,
 		"Vr", TrueAnomalyRadius@,
-		"Vh", {
-			parameter V0, a is orbit:semimajoraxis, e is orbit:eccentricity, b is body.
-			return TrueAnomalyRadius(V0, a, e) - b:radius.
+		"Vh", { // TrueAnomalyAltitude
+			parameter V0,
+				rp is orbit:periapsis + orbit:body:radius,
+				e is orbit:eccentricity,
+				b is body.
+			return TrueAnomalyRadius(V0, rp, e) - b:radius.
+		},
+		"rV", TrueAnomaliesAtRadius@,
+		"hV", { // TrueAnomaliesAtAltitude
+			parameter h,
+				rp is orbit:periapsis + orbit:body:radius,
+				e is orbit:eccentricity,
+				b is body.
+
+			return TrueAnomaliesAtRadius(h + b:radius, rp, e).
 		},
 		"E", EccentricAnomaly@,
 		"F", HyperbolicAnomaly@,
