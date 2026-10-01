@@ -67,6 +67,7 @@
 		if not hasnode return.
 		local mnv is nextnode.
 		local dV0 is mnv:deltav.
+		local completed is true.
 
 		local halfBurnDuration is burnDuration(dV0:mag/2).
 		local leadDuration is halfBurnDuration + leadTime.
@@ -84,6 +85,7 @@
 		lock throttle to mnv_throttle.
 		until vdot(dV0, mnv:deltav) < 0 or (mnv:deltav:mag < BURN_PRECISION and vdot(dV0, mnv:deltav) < 0.5) {
 			autostage().
+			if availableThrust = 0 set completed to false.
 			wait 0.
 		}
 		lock throttle to 0.
@@ -92,6 +94,7 @@
 		unlock mnv_throttle.
 		wait 0.1.
 		remove mnv.
+		return completed.
 	}
 
 	export(lex(

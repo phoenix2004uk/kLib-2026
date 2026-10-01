@@ -32,6 +32,7 @@
 			if not hasnode return.
 			local mnv is nextnode.
 			local dV0 is mnv:deltaV.
+			local completed is true.
 			local halfBurnDuration is burnDuration(dV0:mag/2).
 			wait until mnv:eta <= halfBurnDuration + leadTime.
 			kuniverse:timewarp:cancelwarp().
@@ -42,12 +43,14 @@
 			lock throttle to max(0.001, min(mnv:deltaV:mag * mass / max(1e-6, availableThrust), 1)).
 			until dV0 * mnv:deltaV < 0 or (mnv:deltaV:mag < 1e-2 and dV0 * mnv:deltaV < 0.5) {
 				autostage().
+				if availableThrust = 0 set completed to false.
 				wait 0.
 			}
 			lock throttle to 0.
 			unlock steering.
 			wait 0.1.
 			remove mnv.
+			return completed.
 		}
 	)).
 }
