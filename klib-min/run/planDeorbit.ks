@@ -1,0 +1,1 @@
+{local B is import("mnv/raiseOrLowerApsis-v1"),C is import("util/format-v1").export({parameter A,D.until not hasNode{remove nextNode. wait 0.}dmsg("Planning de-orbit burn",true,true).dmsg("  Pe <= "+C:distance(A),true).add B:Ap(A):val. D:next().}).}

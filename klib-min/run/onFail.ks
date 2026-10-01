@@ -1,0 +1,1 @@
+{local A is" failed - ",B is" failed: ".export(lex("shutdown",{parameter C,D,F is D+" planning".if not C:ok{notify(D+A+"shutting down").dmsg(F+B+C:msg,true).shutdown.}},"reboot",{parameter C,F,D,G is D+" planning".notify(D+A+"rebooting in "+C+" seconds").dmsg(G+B+F,true).wait C. reboot.})).}

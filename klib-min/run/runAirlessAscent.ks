@@ -1,0 +1,1 @@
+{local A is import("prg/airlessAscent-v1").export({parameter B,C,D.dmsg(body:name+" ascent guidance active",true,true).local A is A(B,C).if A<>"ORBITING"and A<>"SUB_ORBITAL"{notify(body:name+" ascent failed - shutting down").dmsg(body:name+" ascent failed: "+A,true).shutdown.}D:next().}).}

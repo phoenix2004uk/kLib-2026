@@ -1,0 +1,1 @@
+{local A is import("mnv/returnToParent-v1"),B is import("run/onFail"),G is import("util/format-v1"),C is"Return to parent".export({parameter D,F.until not hasNode{remove nextNode. wait 0.}dmsg("Planning return to "+F:fetch("Home")+" at "+G:distance(D),true,true).local A is A(D).if not A:val B:shutdown(A,C).if not A:ok B:reboot(60,A:msg,C).F:next().}).}

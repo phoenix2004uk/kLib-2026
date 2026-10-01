@@ -1,0 +1,1 @@
+{local A is import("mnv/changeApsisAtUT-v1"),B is import("run/onFail").export({parameter C,D.until not hasNode{remove nextNode. wait 0.}dmsg("Trimming "+body:name+" re-entry trajectory",true,true).local A is A:Pe(C,time:seconds+60).B:shutdown(A,"Re-entry trim").add A:val. D:next().}).}

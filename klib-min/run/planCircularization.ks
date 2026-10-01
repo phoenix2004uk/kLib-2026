@@ -1,0 +1,1 @@
+{local B is import("mnv/circularizeAtApsis-v1"),C is import("run/onFail").function A{parameter D,F.until not hasNode{remove nextNode. wait 0.}dmsg("Planning "+body:name+" circularization",true,true).local B is D().C:shutdown(B,"Circularization").add B:val. F:next().}export(lex("AtAp",A@:bind(B:Ap),"AtPe",A@:bind(B:Pe))).}

@@ -1,0 +1,1 @@
+{local A is import("prg/airlessDescent-v2"),B is import("sys/staging-v1"):stageUntil. export({parameter C,D.dmsg(body:name+" descent guidance active",true,true).B(C).A().clearScreen. dmsg(body:name+" landing complete",true,true).D:next().}).}

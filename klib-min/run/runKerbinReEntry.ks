@@ -1,0 +1,1 @@
+{local A is import("prg/atmosphericDescent-v1").export({parameter B,C,D.dmsg(body:name+" descent guidance active",true,true).A(C,B).D:next().}).}

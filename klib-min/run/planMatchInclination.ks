@@ -1,0 +1,1 @@
+{local B is import("mnv/matchInclination-v1"),C is import("run/onFail").export({parameter A,D,F,G.until not hasNode{remove nextNode. wait 0.}dmsg("Planning to match inclination with "+A:name,true,true).local B is B(A,D,F).C:shutdown(B,"Inclination change").add B:val. G:next().}).}

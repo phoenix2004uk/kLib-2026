@@ -1,0 +1,1 @@
+{local A is import("prg/atmosphericAscent-v2"),B is import("sys/staging-v1"):stageUntil. export(lex("ascent",{parameter B,C,D.dmsg("Beginning "+body:name+" ascent",true,true).A:executeAscent(B,C).D:next().},"insertion",{parameter C,D,F.dmsg("Performing "+body:name+" orbital insertion",true,true).A:orbitalInsertion(C).B(D).F:next().})).}
