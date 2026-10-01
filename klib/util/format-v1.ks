@@ -1,5 +1,9 @@
 {
 	local TIME_DIVISORS is list(9201600,21600,3600,60).
+	local DISTANCE_SUFFIXES is list("mm","cm","m","km","Mm","Gm","Tm").
+	local FORCE_SUFFIXES is list("N","kN","MN").
+	local MASS_SUFFIXES is list("g","kg","t","kt","Mt").
+
 	function formatScalarTime {
 		parameter value.
 
@@ -21,7 +25,6 @@
 			"{0:0.00}s":format(magnitude).
 	}
 
-	local DISTANCE_SUFFIXES is list("mm","cm","m","km","Mm","Gm","Tm").
 	function formatScalarDistance {
 		parameter value.
 
@@ -37,7 +40,6 @@
 		) + DISTANCE_SUFFIXES[unit].
 	}
 
-	local FORCE_SUFFIXES is list("N","kN","MN").
 	function formatScalarForce {
 		parameter value.
 
@@ -52,7 +54,6 @@
 		) + FORCE_SUFFIXES[unit].
 	}
 
-	local MASS_SUFFIXES is list("g","kg","t","kt","Mt").
 	function formatScalarMass {
 		parameter value.
 
