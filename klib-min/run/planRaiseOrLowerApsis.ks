@@ -1,0 +1,1 @@
+{local B is import("mnv/raiseOrLowerApsis-v1"),C is import("run/onFail").function A{parameter D,F,G.until not hasNode{remove nextNode. wait 0.}dmsg("Planning apsis change",true,true).local B is D(F).C:shutdown(B,"Change apsis").add B:val. G:next().}export(lex("Ap",A@:bind(B:Ap),"Pe",A@:bind(B:Pe))).}

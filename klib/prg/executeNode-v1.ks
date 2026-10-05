@@ -50,7 +50,7 @@
 		parameter leadTime is 60.
 
 		if not hasnode return.
-		local mnv is nextnode.
+		local mnv is nextNode.
 
 		local halfBurnDuration is burnDuration(mnv:deltav:mag/2).
 		local leadDuration is halfBurnDuration + leadTime.
@@ -65,9 +65,9 @@
 		parameter leadTime is 60.
 
 		if not hasnode return.
-		local mnv is nextnode.
+		local mnv is nextNode.
 		local dV0 is mnv:deltav.
-		local completed is true.
+		local success is true.
 
 		local halfBurnDuration is burnDuration(dV0:mag/2).
 		local leadDuration is halfBurnDuration + leadTime.
@@ -85,16 +85,21 @@
 		lock throttle to mnv_throttle.
 		until vdot(dV0, mnv:deltav) < 0 or (mnv:deltav:mag < BURN_PRECISION and vdot(dV0, mnv:deltav) < 0.5) {
 			autostage().
-			if availableThrust = 0 set completed to false.
 			wait 0.
+			if availableThrust = 0 {
+				set success to false.
+				break.
+			}
+			if not hasNode break.
+			set mnv to nextNode.
 		}
 		lock throttle to 0.
 		unlock steering.
 		unlock max_acceleration.
 		unlock mnv_throttle.
 		wait 0.1.
-		remove mnv.
-		return completed.
+		if hasNode remove nextNode.
+		return success.
 	}
 
 	export(lex(
